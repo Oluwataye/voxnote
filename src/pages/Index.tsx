@@ -28,14 +28,16 @@ const Index = () => {
   };
 
   const createConsultation = async (content: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
     const { data: consultation, error: consultationError } = await supabase
       .from('consultations')
-      .insert([
-        { 
-          original_language: 'en',
-          status: 'draft'
-        }
-      ])
+      .insert({
+        original_language: 'en',
+        status: 'draft',
+        user_id: user.id
+      })
       .select()
       .single();
 
