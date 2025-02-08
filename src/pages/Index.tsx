@@ -1,5 +1,17 @@
 
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
 const Index = () => {
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } catch (error) {
+      toast.error("Error signing out");
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-4xl space-y-8 animate-in">
@@ -19,8 +31,10 @@ const Index = () => {
           <button className="px-6 py-3 text-sm font-medium bg-primary text-primary-foreground rounded-lg transition-colors hover:bg-primary/90">
             Get Started
           </button>
-          <button className="px-6 py-3 text-sm font-medium bg-secondary text-secondary-foreground rounded-lg transition-colors hover:bg-secondary/80">
-            Learn More
+          <button 
+            onClick={handleLogout}
+            className="px-6 py-3 text-sm font-medium bg-secondary text-secondary-foreground rounded-lg transition-colors hover:bg-secondary/80">
+            Sign Out
           </button>
         </div>
       </div>
