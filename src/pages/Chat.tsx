@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, Send, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 
 interface Message {
@@ -111,24 +111,27 @@ const Chat = () => {
   };
 
   return (
-    <div className="min-h-screen p-4 flex flex-col max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Chat</h1>
+    <div className="min-h-screen p-4 md:p-6 flex flex-col max-w-4xl mx-auto bg-gradient-to-b from-[#F1F0FB] to-white">
+      <div className="flex items-center gap-2 mb-6">
+        <MessageSquare className="w-6 h-6 text-[#9b87f5]" />
+        <h1 className="text-2xl font-semibold text-[#7E69AB]">Chat Assistant</h1>
+      </div>
       
-      <div className="flex-1 min-h-[500px] bg-card rounded-lg p-4 mb-4 flex flex-col">
-        <ScrollArea className="flex-1" ref={scrollAreaRef}>
+      <div className="flex-1 min-h-[500px] bg-white rounded-2xl p-4 md:p-6 mb-4 flex flex-col shadow-lg border border-[#D6BCFA]/20">
+        <ScrollArea className="flex-1 pr-4" ref={scrollAreaRef}>
           <div className="space-y-4">
             {messages.map((message) => (
               <div
                 key={message.id}
                 className={`flex ${
                   message.role === 'user' ? 'justify-end' : 'justify-start'
-                }`}
+                } animate-fade-in`}
               >
                 <div
-                  className={`max-w-[80%] p-3 rounded-lg ${
+                  className={`max-w-[80%] p-4 rounded-2xl shadow-sm ${
                     message.role === 'user'
-                      ? 'bg-primary text-primary-foreground ml-4'
-                      : 'bg-muted mr-4'
+                      ? 'bg-[#9b87f5] text-white ml-4'
+                      : 'bg-[#F1F0FB] text-[#7E69AB] mr-4'
                   }`}
                 >
                   {message.content}
@@ -139,24 +142,25 @@ const Chat = () => {
         </ScrollArea>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex gap-2">
+      <form onSubmit={handleSubmit} className="flex gap-3">
         <Textarea
           ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Type your message..."
-          className="flex-1"
+          className="flex-1 resize-none rounded-xl border-[#D6BCFA]/30 focus:border-[#9b87f5] focus-visible:ring-[#9b87f5]/20 shadow-sm"
           rows={1}
         />
         <Button 
           type="submit" 
           disabled={sendMessageMutation.isPending || !input.trim()}
+          className="rounded-xl bg-[#9b87f5] hover:bg-[#7E69AB] transition-colors shadow-sm"
         >
           {sendMessageMutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-5 w-5 animate-spin" />
           ) : (
-            'Send'
+            <Send className="h-5 w-5" />
           )}
         </Button>
       </form>
