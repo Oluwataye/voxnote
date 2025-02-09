@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Loader2, Send, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
+import { AIVoiceInput } from "@/components/ui/ai-voice-input";
 
 interface Message {
   id: string;
@@ -19,6 +19,7 @@ const Chat = () => {
   const [input, setInput] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
 
   // Fetch chat history
   const { data: messages = [], refetch: refetchMessages } = useQuery({
@@ -110,6 +111,16 @@ const Chat = () => {
     }
   };
 
+  const handleVoiceStart = () => {
+    toast.info("Voice recording started");
+  };
+
+  const handleVoiceStop = (duration: number) => {
+    toast.success(`Recording stopped after ${duration} seconds`);
+    // Here you would typically process the voice recording
+    // and convert it to text using a speech-to-text service
+  };
+
   return (
     <div className="min-h-screen p-4 md:p-6 flex flex-col max-w-4xl mx-auto bg-gradient-to-b from-[#F1F0FB] to-white">
       <div className="flex items-center gap-2 mb-6">
@@ -142,28 +153,46 @@ const Chat = () => {
         </ScrollArea>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex gap-3">
-        <Textarea
-          ref={textareaRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Type your message..."
-          className="flex-1 resize-none rounded-xl border-[#D6BCFA]/30 focus:border-[#9b87f5] focus-visible:ring-[#9b87f5]/20 shadow-sm"
-          rows={1}
+      {isVoiceMode ? (
+        <AIVoiceInput
+          onStart={handleVoiceStart}
+          onStop={handleVoiceStop}
+          className="mb-4"
         />
-        <Button 
-          type="submit" 
-          disabled={sendMessageMutation.isPending || !input.trim()}
-          className="rounded-xl bg-[#9b87f5] hover:bg-[#7E69AB] transition-colors shadow-sm"
-        >
-          {sendMessageMutation.isPending ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <Send className="h-5 w-5" />
-          )}
-        </Button>
-      </form>
+      ) : (
+        <form onSubmit={handleSubmit} className="flex gap-3">
+          <Textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Type your message..."
+            className="flex-1 resize-none rounded-xl border-[#D6BCFA]/30 focus:border-[#9b87f5] focus-visible:ring-[#9b87f5]/20 shadow-sm"
+            rows={1}
+          />
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsVoiceMode(true)}
+              className="rounded-xl border-[#D6BCFA]/30 hover:bg-[#F1F0FB] transition-colors"
+            >
+              <Mic className="h-5 w-5 text-[#9b87f5]" />
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={sendMessageMutation.isPending || !input.trim()}
+              className="rounded-xl bg-[#9b87f5] hover:bg-[#7E69AB] transition-colors shadow-sm"
+            >
+              {sendMessageMutation.isPending ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
+            </Button>
+          </div>
+        </form>
+      )}
     </div>
   );
 };
