@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Send, Mic } from "lucide-react";
 import { AIVoiceInput } from "@/components/ui/ai-voice-input";
+import { toast } from "@/components/ui/use-toast";
 
 interface ChatInputProps {
   onSubmit: (content: string) => Promise<void>;
@@ -35,11 +36,15 @@ export const ChatInput = ({ onSubmit, isLoading }: ChatInputProps) => {
   };
 
   const handleVoiceStart = () => {
-    toast.info("Voice recording started");
+    toast({
+      description: "Voice recording started"
+    });
   };
 
   const handleVoiceStop = (duration: number) => {
-    toast.success(`Recording stopped after ${duration} seconds`);
+    toast({
+      description: `Recording stopped after ${duration} seconds`
+    });
   };
 
   if (isVoiceMode) {
@@ -87,3 +92,4 @@ export const ChatInput = ({ onSubmit, isLoading }: ChatInputProps) => {
     </form>
   );
 };
+
