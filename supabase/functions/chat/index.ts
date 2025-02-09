@@ -16,17 +16,33 @@ Deno.serve(async (req) => {
   try {
     const { messages } = await req.json()
 
+    if (!messages || !Array.isArray(messages)) {
+      throw new Error('Invalid messages format')
+    }
+
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openAIApiKey) {
+      throw new Error('OpenAI API key not configured')
+    }
+
     // Initialize OpenAI client
     const configuration = new Configuration({
-      apiKey: Deno.env.get('OPENAI_API_KEY'),
+      apiKey: openAIApiKey,
     })
     const openai = new OpenAIApi(configuration)
 
     // Create chat completion
     const completion = await openai.createChatCompletion({
       model: 'gpt-3.5-turbo',
-      messages: messages,
+      messages: messages.map(({ content, role }) => ({
+        role,
+        content,
+      })),
     })
+
+    if (!completion.data.choices[0].message) {
+      throw new Error('No response from OpenAI')
+    }
 
     const response = completion.data.choices[0].message
 
@@ -34,6 +50,7 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
+    console.error('Error in chat function:', error)
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
