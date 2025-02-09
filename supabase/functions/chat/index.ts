@@ -1,6 +1,6 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
-import { Configuration, OpenAIApi } from 'https://esm.sh/openai@3.3.0'
+import OpenAI from 'https://esm.sh/openai@4.20.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,13 +26,12 @@ Deno.serve(async (req) => {
     }
 
     // Initialize OpenAI client
-    const configuration = new Configuration({
+    const openai = new OpenAI({
       apiKey: openAIApiKey,
     })
-    const openai = new OpenAIApi(configuration)
 
     // Create chat completion
-    const completion = await openai.createChatCompletion({
+    const completion = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages: messages.map(({ content, role }) => ({
         role,
@@ -40,11 +39,11 @@ Deno.serve(async (req) => {
       })),
     })
 
-    if (!completion.data.choices[0].message) {
+    if (!completion.choices[0].message) {
       throw new Error('No response from OpenAI')
     }
 
-    const response = completion.data.choices[0].message
+    const response = completion.choices[0].message
 
     return new Response(JSON.stringify({ response }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
