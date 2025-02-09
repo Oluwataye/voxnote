@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -65,7 +64,7 @@ export const ChatInput = ({ onSubmit, isLoading }: ChatInputProps) => {
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Type your message..."
-        className="flex-1 resize-none rounded-xl border-[#D6BCFA]/30 focus:border-[#9b87f5] focus-visible:ring-[#9b87f5]/20 shadow-sm"
+        className="flex-1 resize-none rounded-xl bg-[#222837] border-white/5 focus:border-[#9b87f5] focus-visible:ring-[#9b87f5]/20 text-white placeholder:text-gray-400"
         rows={1}
       />
       <div className="flex gap-2">
@@ -73,14 +72,14 @@ export const ChatInput = ({ onSubmit, isLoading }: ChatInputProps) => {
           type="button"
           variant="outline"
           onClick={() => setIsVoiceMode(true)}
-          className="rounded-xl border-[#D6BCFA]/30 hover:bg-[#F1F0FB] transition-colors"
+          className="rounded-xl border-white/5 bg-[#222837] hover:bg-[#2A3041] transition-colors text-white"
         >
           <Mic className="h-5 w-5 text-[#9b87f5]" />
         </Button>
         <Button 
           type="submit" 
           disabled={isLoading || !input.trim()}
-          className="rounded-xl bg-[#9b87f5] hover:bg-[#7E69AB] transition-colors shadow-sm"
+          className="rounded-xl bg-[#9b87f5] hover:bg-[#7E69AB] transition-colors text-white shadow-sm disabled:bg-[#9b87f5]/50"
         >
           {isLoading ? (
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -92,4 +91,3 @@ export const ChatInput = ({ onSubmit, isLoading }: ChatInputProps) => {
     </form>
   );
 };
-

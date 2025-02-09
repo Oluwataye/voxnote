@@ -84,10 +84,10 @@ const Chat = () => {
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-6 flex flex-col max-w-4xl mx-auto bg-gradient-to-b from-[#F1F0FB] to-white">
+    <div className="min-h-screen p-4 md:p-6 flex flex-col max-w-4xl mx-auto bg-gradient-to-b from-[#1A1F2C] to-[#13151C]">
       <ChatHeader />
       
-      <div className="flex-1 min-h-[500px] bg-white rounded-2xl p-4 md:p-6 mb-4 flex flex-col shadow-lg border border-[#D6BCFA]/20">
+      <div className="flex-1 min-h-[500px] bg-[#222837] rounded-2xl p-4 md:p-6 mb-4 flex flex-col shadow-lg border border-white/5">
         <MessageList messages={messages} />
       </div>
 

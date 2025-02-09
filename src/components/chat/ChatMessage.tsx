@@ -17,7 +17,7 @@ export const ChatMessage = ({ content, role, id }: ChatMessageProps) => {
         className={`max-w-[80%] p-4 rounded-2xl shadow-sm ${
           role === 'user'
             ? 'bg-[#9b87f5] text-white ml-4'
-            : 'bg-[#F1F0FB] text-[#7E69AB] mr-4'
+            : 'bg-[#2A3041] text-white/90 mr-4'
         }`}
       >
         {content}
