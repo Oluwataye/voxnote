@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -11,10 +12,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import VoiceInterface from "@/components/VoiceInterface";
+import { MessageSquare } from "lucide-react";
 
 const Dashboard = () => {
   const [content, setContent] = useState("");
-  const [targetLanguage, setTargetLanguage] = useState("es");
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [consultationId, setConsultationId] = useState<string | null>(null);
 
   const createConsultation = async (content: string) => {
@@ -50,54 +53,8 @@ const Dashboard = () => {
     return consultation.id;
   };
 
-  const translateContent = async ({ consultationId, content, targetLanguage }: { 
-    consultationId: string, 
-    content: string, 
-    targetLanguage: string 
-  }) => {
-    // For now, we'll just create a mock translation
-    // In a real application, you would call a translation service here
-    const mockTranslation = `[${targetLanguage}] ${content}`;
-
-    const { error } = await supabase
-      .from('consultation_contents')
-      .insert([
-        {
-          consultation_id: consultationId,
-          content: mockTranslation,
-          language: targetLanguage,
-          is_original: false
-        }
-      ]);
-
-    if (error) throw error;
-    return mockTranslation;
-  };
-
-  const translationMutation = useMutation({
-    mutationFn: async () => {
-      if (!content) throw new Error("Please enter some content to translate");
-      
-      // Create consultation if it doesn't exist
-      const cId = consultationId || await createConsultation(content);
-      
-      // Perform translation
-      return translateContent({ 
-        consultationId: cId, 
-        content, 
-        targetLanguage 
-      });
-    },
-    onSuccess: () => {
-      toast.success("Translation created successfully!");
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    }
-  });
-
-  const { data: translations } = useQuery({
-    queryKey: ['translations', consultationId],
+  const { data: transcripts } = useQuery({
+    queryKey: ['transcripts', consultationId],
     queryFn: async () => {
       if (!consultationId) return [];
       
@@ -105,7 +62,7 @@ const Dashboard = () => {
         .from('consultation_contents')
         .select('*')
         .eq('consultation_id', consultationId)
-        .eq('is_original', false);
+        .eq('is_original', true);
         
       if (error) throw error;
       return data;
@@ -114,78 +71,44 @@ const Dashboard = () => {
   });
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-4xl space-y-8 animate-in">
-        <div className="text-center space-y-4">
-          <span className="inline-block px-3 py-1 text-sm font-medium bg-secondary text-secondary-foreground rounded-full">
-            Translation System
-          </span>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight">
-            Multilingual Content Manager
-          </h1>
-          <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto">
-            Create and manage translations for your content across multiple languages.
-          </p>
+    <div className="min-h-screen bg-gradient-to-b from-[#1A1F2C] to-[#13151C] text-white">
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="flex items-center gap-3 mb-8">
+          <MessageSquare className="w-8 h-8 text-[#9b87f5]" />
+          <h1 className="text-3xl font-semibold">Medical Consultation Assistant</h1>
         </div>
 
-        <div className="space-y-6 bg-card p-6 rounded-lg shadow-sm">
-          <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="content">
-              Original Content (English)
-            </label>
-            <Textarea
-              id="content"
-              placeholder="Enter your content here..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="min-h-[100px]"
-            />
-          </div>
-
-          <div className="flex gap-4 items-end">
-            <div className="space-y-2 flex-1">
-              <label className="text-sm font-medium">
-                Target Language
-              </label>
-              <Select
-                value={targetLanguage}
-                onValueChange={setTargetLanguage}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="es">Spanish</SelectItem>
-                  <SelectItem value="fr">French</SelectItem>
-                  <SelectItem value="de">German</SelectItem>
-                  <SelectItem value="it">Italian</SelectItem>
-                </SelectContent>
-              </Select>
+        <div className="space-y-6">
+          <div className="bg-[#222837] rounded-2xl p-6 shadow-lg border border-white/5">
+            <h2 className="text-xl font-medium mb-4">Current Consultation</h2>
+            <div className="space-y-4">
+              <Textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                className="min-h-[200px] bg-[#2A3041] border-white/5 focus:border-[#9b87f5] focus-visible:ring-[#9b87f5]/20 text-white placeholder:text-gray-400"
+                placeholder="Consultation notes will appear here in real-time..."
+              />
             </div>
-            <Button 
-              onClick={() => translationMutation.mutate()}
-              disabled={translationMutation.isPending}
-            >
-              {translationMutation.isPending ? "Translating..." : "Translate"}
-            </Button>
           </div>
 
-          {translations && translations.length > 0 && (
-            <div className="space-y-4 mt-8">
-              <h2 className="text-xl font-semibold">Translations</h2>
+          {transcripts && transcripts.length > 0 && (
+            <div className="bg-[#222837] rounded-2xl p-6 shadow-lg border border-white/5">
+              <h2 className="text-xl font-medium mb-4">Consultation History</h2>
               <div className="space-y-4">
-                {translations.map((translation, index) => (
-                  <div key={index} className="p-4 bg-muted rounded-lg">
-                    <div className="text-sm font-medium text-muted-foreground mb-2">
-                      {translation.language.toUpperCase()}
+                {transcripts.map((transcript, index) => (
+                  <div key={index} className="p-4 bg-[#2A3041] rounded-xl">
+                    <div className="text-sm text-gray-400 mb-2">
+                      {new Date(transcript.created_at).toLocaleString()}
                     </div>
-                    <div>{translation.content}</div>
+                    <div className="text-white/90">{transcript.content}</div>
                   </div>
                 ))}
               </div>
             </div>
           )}
         </div>
+
+        <VoiceInterface onSpeakingChange={setIsSpeaking} />
       </div>
     </div>
   );
