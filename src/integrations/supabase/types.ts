@@ -50,7 +50,11 @@ export type Database = {
       consultations: {
         Row: {
           created_at: string
+          document_type: string | null
+          document_url: string | null
           id: string
+          is_paused: boolean | null
+          last_position: number | null
           original_language: string
           patient_reference: string | null
           status: Database["public"]["Enums"]["consultation_status"] | null
@@ -59,7 +63,11 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          document_type?: string | null
+          document_url?: string | null
           id?: string
+          is_paused?: boolean | null
+          last_position?: number | null
           original_language?: string
           patient_reference?: string | null
           status?: Database["public"]["Enums"]["consultation_status"] | null
@@ -68,7 +76,11 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          document_type?: string | null
+          document_url?: string | null
           id?: string
+          is_paused?: boolean | null
+          last_position?: number | null
           original_language?: string
           patient_reference?: string | null
           status?: Database["public"]["Enums"]["consultation_status"] | null
@@ -116,6 +128,36 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          auto_save: boolean | null
+          created_at: string
+          id: string
+          language: string | null
+          updated_at: string
+          user_id: string
+          voice_id: string | null
+        }
+        Insert: {
+          auto_save?: boolean | null
+          created_at?: string
+          id?: string
+          language?: string | null
+          updated_at?: string
+          user_id: string
+          voice_id?: string | null
+        }
+        Update: {
+          auto_save?: boolean | null
+          created_at?: string
+          id?: string
+          language?: string | null
+          updated_at?: string
+          user_id?: string
+          voice_id?: string | null
         }
         Relationships: []
       }

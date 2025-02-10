@@ -11,6 +11,7 @@ import { AppSidebar } from "./components/AppSidebar";
 import Dashboard from "./pages/Dashboard";
 import Chat from "./pages/Chat";
 import Auth from "./pages/Auth";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,6 +66,16 @@ const App = () => {
                     element={
                       isAuthenticated ? (
                         <Chat />
+                      ) : (
+                        <Navigate to="/auth" replace />
+                      )
+                    }
+                  />
+                  <Route
+                    path="/settings"
+                    element={
+                      isAuthenticated ? (
+                        <Settings />
                       ) : (
                         <Navigate to="/auth" replace />
                       )

@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import VoiceInterface from "@/components/VoiceInterface";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Download } from "lucide-react";
 
 const Dashboard = () => {
   const [content, setContent] = useState("");
@@ -53,22 +53,47 @@ const Dashboard = () => {
     return consultation.id;
   };
 
-  const { data: transcripts } = useQuery({
-    queryKey: ['transcripts', consultationId],
+  const { data: consultations } = useQuery({
+    queryKey: ['consultations'],
     queryFn: async () => {
-      if (!consultationId) return [];
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
       
       const { data, error } = await supabase
-        .from('consultation_contents')
-        .select('*')
-        .eq('consultation_id', consultationId)
-        .eq('is_original', true);
+        .from('consultations')
+        .select(`
+          *,
+          consultation_contents (
+            content,
+            language,
+            created_at
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
         
       if (error) throw error;
       return data;
-    },
-    enabled: !!consultationId
+    }
   });
+
+  const downloadDocument = async (consultationId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('consultations')
+        .select('document_url')
+        .eq('id', consultationId)
+        .single();
+
+      if (error) throw error;
+      if (!data.document_url) throw new Error('No document available');
+
+      window.open(data.document_url, '_blank');
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      toast.error("Failed to download document");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#1A1F2C] to-[#13151C] text-white">
@@ -94,16 +119,42 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {transcripts && transcripts.length > 0 && (
+          {consultations && consultations.length > 0 && (
             <div className="bg-[#222837] rounded-2xl p-6 shadow-lg border border-white/5">
               <h2 className="text-xl font-medium mb-4">Consultation History</h2>
               <div className="space-y-4">
-                {transcripts.map((transcript, index) => (
-                  <div key={index} className="p-4 bg-[#2A3041] rounded-xl">
-                    <div className="text-sm text-gray-400 mb-2">
-                      {new Date(transcript.created_at).toLocaleString()}
+                {consultations.map((consultation) => (
+                  <div key={consultation.id} className="p-4 bg-[#2A3041] rounded-xl">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm text-gray-400">
+                        {new Date(consultation.created_at).toLocaleString()}
+                      </div>
+                      {consultation.document_url && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => downloadDocument(consultation.id)}
+                          className="text-[#9b87f5] hover:text-[#7E69AB]"
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Download
+                        </Button>
+                      )}
                     </div>
-                    <div className="text-white/90">{transcript.content}</div>
+                    <div className="text-white/90">
+                      {consultation.consultation_contents?.[0]?.content || 'No content available'}
+                    </div>
+                    <div className="mt-2 text-sm">
+                      <span className={`px-2 py-1 rounded-full ${
+                        consultation.status === 'completed' 
+                          ? 'bg-green-500/20 text-green-400'
+                          : consultation.status === 'in_progress'
+                          ? 'bg-blue-500/20 text-blue-400'
+                          : 'bg-gray-500/20 text-gray-400'
+                      }`}>
+                        {consultation.status}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -118,4 +169,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-
