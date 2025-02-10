@@ -2,6 +2,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import { AudioRecorder } from "./AudioRecorder";
 import { encodeAudioData } from "./audioUtils";
+import { 
+  RealtimeEvent, 
+  SessionConfig, 
+  MessageEvent, 
+  SessionCreatedEvent 
+} from "./types";
 
 export class RealtimeChat {
   private pc: RTCPeerConnection | null = null;
@@ -11,7 +17,7 @@ export class RealtimeChat {
   private audioContext: AudioContext;
   private isPaused: boolean = false;
 
-  constructor(private onMessage: (message: any) => void) {
+  constructor(private onMessage: (message: RealtimeEvent) => void) {
     this.audioEl = document.createElement("audio");
     this.audioEl.autoplay = true;
     this.audioContext = new AudioContext({
@@ -56,7 +62,7 @@ export class RealtimeChat {
 
       this.dc = this.pc.createDataChannel("oai-events");
       this.dc.addEventListener("message", (e) => {
-        const event = JSON.parse(e.data);
+        const event = JSON.parse(e.data) as RealtimeEvent;
         console.log("Received event:", event);
         this.onMessage(event);
       });
@@ -104,7 +110,7 @@ export class RealtimeChat {
       throw new Error('Data channel not ready');
     }
 
-    const event = {
+    const event: MessageEvent = {
       type: 'conversation.item.create',
       item: {
         type: 'message',
