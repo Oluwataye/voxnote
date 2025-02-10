@@ -42,6 +42,10 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
+      <div className="p-4 mb-4">
+        <h1 className="text-xl font-bold text-white">VoxNote</h1>
+        <p className="text-sm text-gray-400">Medical Assistant</p>
+      </div>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
@@ -73,4 +77,5 @@ export function AppSidebar() {
       </SidebarFooter>
     </Sidebar>
   );
-}
+};
+
