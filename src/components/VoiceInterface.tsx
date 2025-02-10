@@ -3,6 +3,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { RealtimeChat } from '@/utils/RealtimeAudio';
+import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 interface VoiceInterfaceProps {
   onSpeakingChange: (speaking: boolean) => void;
@@ -10,8 +12,34 @@ interface VoiceInterfaceProps {
 
 const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isConnected, setIsConnected] = useState(false);
   const chatRef = useRef<RealtimeChat | null>(null);
+
+  useEffect(() => {
+    // Check authentication status
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate('/auth');
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to use the voice features",
+          variant: "destructive",
+        });
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session) {
+        navigate('/auth');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate, toast]);
 
   const handleMessage = (event: any) => {
     console.log('Received message:', event);
@@ -25,6 +53,18 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
 
   const startConversation = async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        navigate('/auth');
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to use the voice features",
+          variant: "destructive",
+        });
+        return;
+      }
+
       chatRef.current = new RealtimeChat(handleMessage);
       await chatRef.current.init();
       setIsConnected(true);

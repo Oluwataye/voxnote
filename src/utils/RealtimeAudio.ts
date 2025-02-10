@@ -74,6 +74,12 @@ export class RealtimeChat {
 
   async init() {
     try {
+      // Check authentication first
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("Authentication required");
+      }
+
       // Get ephemeral token from our Supabase Edge Function
       const tokenResponse = await supabase.functions.invoke("realtime-chat");
       const data = await tokenResponse.data;
