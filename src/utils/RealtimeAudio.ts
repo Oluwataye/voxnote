@@ -96,6 +96,18 @@ export class RealtimeChat {
       // Set up remote audio
       this.pc.ontrack = e => this.audioEl.srcObject = e.streams[0];
 
+      // Add local audio track
+      const ms = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          sampleRate: 24000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      ms.getTracks().forEach(track => this.pc?.addTrack(track, ms));
+
       // Set up data channel
       this.dc = this.pc.createDataChannel("oai-events");
       this.dc.addEventListener("message", (e) => {
