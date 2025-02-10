@@ -1,7 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/use-toast';
 import { RealtimeChat } from '@/utils/RealtimeAudio';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -19,7 +18,6 @@ interface VoiceInterfaceProps {
 }
 
 const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => {
-  const { toast } = useToast();
   const navigate = useNavigate();
   const [isConnected, setIsConnected] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -31,11 +29,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
         navigate('/auth');
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in to use the voice features",
-          variant: "destructive",
-        });
+        toast.error("Authentication required. Please sign in to use the voice features");
       }
     });
 
@@ -49,7 +43,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate, toast]);
+  }, [navigate]);
 
   const handleMessage = (event: any) => {
     console.log('Received message:', event);
@@ -67,11 +61,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
       
       if (!session) {
         navigate('/auth');
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in to use the voice features",
-          variant: "destructive",
-        });
+        toast.error("Authentication required. Please sign in to use the voice features");
         return;
       }
 
@@ -94,17 +84,10 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
       setIsConnected(true);
       setIsPaused(false);
       
-      toast({
-        title: "Connected",
-        description: "Voice interface is ready",
-      });
+      toast.success("Connected! Voice interface is ready");
     } catch (error) {
       console.error('Error starting consultation:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : 'Failed to start consultation',
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : 'Failed to start consultation');
     }
   };
 

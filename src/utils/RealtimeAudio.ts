@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export class AudioRecorder {
@@ -67,6 +66,7 @@ export class RealtimeChat {
   private audioEl: HTMLAudioElement;
   private recorder: AudioRecorder | null = null;
   private audioContext: AudioContext;
+  private isPaused: boolean = false;
 
   constructor(private onMessage: (message: any) => void) {
     this.audioEl = document.createElement("audio");
@@ -205,6 +205,20 @@ export class RealtimeChat {
 
     this.dc.send(JSON.stringify(event));
     this.dc.send(JSON.stringify({type: 'response.create'}));
+  }
+
+  pause() {
+    if (this.audioContext.state === 'running') {
+      this.audioContext.suspend();
+      this.isPaused = true;
+    }
+  }
+
+  resume() {
+    if (this.audioContext.state === 'suspended') {
+      this.audioContext.resume();
+      this.isPaused = false;
+    }
   }
 
   disconnect() {
