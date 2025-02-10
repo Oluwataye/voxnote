@@ -66,10 +66,14 @@ export class RealtimeChat {
   private dc: RTCDataChannel | null = null;
   private audioEl: HTMLAudioElement;
   private recorder: AudioRecorder | null = null;
+  private audioContext: AudioContext;
 
   constructor(private onMessage: (message: any) => void) {
     this.audioEl = document.createElement("audio");
     this.audioEl.autoplay = true;
+    this.audioContext = new AudioContext({
+      sampleRate: 24000
+    });
   }
 
   async init() {
@@ -94,7 +98,11 @@ export class RealtimeChat {
       this.pc = new RTCPeerConnection();
 
       // Set up remote audio
-      this.pc.ontrack = e => this.audioEl.srcObject = e.streams[0];
+      this.pc.ontrack = e => {
+        const stream = e.streams[0];
+        const source = this.audioContext.createMediaStreamSource(stream);
+        source.connect(this.audioContext.destination);
+      };
 
       // Add local audio track
       const ms = await navigator.mediaDevices.getUserMedia({ 
@@ -203,5 +211,8 @@ export class RealtimeChat {
     this.recorder?.stop();
     this.dc?.close();
     this.pc?.close();
+    if (this.audioContext.state !== 'closed') {
+      this.audioContext.close();
+    }
   }
 }
