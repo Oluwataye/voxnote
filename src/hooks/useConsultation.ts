@@ -4,13 +4,29 @@ import { supabase } from '@/integrations/supabase/client';
 import { RealtimeChat } from '@/utils/audio';
 import { toast } from 'sonner';
 
-export const useConsultation = (onSpeakingChange: (speaking: boolean) => void) => {
+interface ConsultationHookResult {
+  isConnected: boolean;
+  isPaused: boolean;
+  isStarting: boolean;
+  consultationId: string | null;
+  startConsultation: (chatRef: React.MutableRefObject<RealtimeChat | null>) => Promise<void>;
+  pauseConsultation: () => Promise<void>;
+  resumeConsultation: () => Promise<void>;
+  endConsultation: (chatRef: React.MutableRefObject<RealtimeChat | null>) => Promise<void>;
+}
+
+interface MessageEvent {
+  type: string;
+  [key: string]: any;
+}
+
+export const useConsultation = (onSpeakingChange: (speaking: boolean) => void): ConsultationHookResult => {
   const [isConnected, setIsConnected] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [consultationId, setConsultationId] = useState<string | null>(null);
 
-  const handleMessage = (event: any) => {
+  const handleMessage = (event: MessageEvent) => {
     console.log('Received message:', event);
     
     if (event.type === 'response.audio.delta') {
