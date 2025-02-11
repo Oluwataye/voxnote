@@ -25,6 +25,30 @@ export class RealtimeChat {
     });
   }
 
+  private async requestMicrophonePermission(): Promise<MediaStream> {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          sampleRate: 24000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      return stream;
+    } catch (error) {
+      if (error instanceof DOMException) {
+        if (error.name === 'NotAllowedError') {
+          throw new Error('Microphone access denied. Please allow microphone access to use the voice features.');
+        } else if (error.name === 'NotFoundError') {
+          throw new Error('No microphone found. Please connect a microphone to use the voice features.');
+        }
+      }
+      throw error;
+    }
+  }
+
   async init() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -41,6 +65,9 @@ export class RealtimeChat {
 
       const EPHEMERAL_KEY = data.client_secret.value;
 
+      // Request microphone permission first
+      const ms = await this.requestMicrophonePermission();
+
       this.pc = new RTCPeerConnection();
 
       this.pc.ontrack = async e => {
@@ -51,15 +78,6 @@ export class RealtimeChat {
         source.connect(streamAudioContext.destination);
       };
 
-      const ms = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          sampleRate: 24000,
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        } 
-      });
       ms.getTracks().forEach(track => this.pc?.addTrack(track, ms));
 
       this.dc = this.pc.createDataChannel("oai-events");

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { RealtimeChat } from '@/utils/audio';
@@ -21,6 +20,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
   const navigate = useNavigate();
   const [isConnected, setIsConnected] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const [consultationId, setConsultationId] = useState<string | null>(null);
   const chatRef = useRef<RealtimeChat | null>(null);
 
@@ -57,6 +57,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
 
   const startConsultation = async () => {
     try {
+      setIsStarting(true);
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
@@ -87,7 +88,13 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
       toast.success("Connected! Voice interface is ready");
     } catch (error) {
       console.error('Error starting consultation:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to start consultation');
+      if (error instanceof Error && error.message.includes('microphone')) {
+        toast.error(error.message);
+      } else {
+        toast.error(error instanceof Error ? error.message : 'Failed to start consultation');
+      }
+    } finally {
+      setIsStarting(false);
     }
   };
 
@@ -196,9 +203,10 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
         <Button 
           onClick={startConsultation}
           className="bg-[#9b87f5] hover:bg-[#7E69AB] text-white"
+          disabled={isStarting}
         >
           <Mic className="w-4 h-4 mr-2" />
-          Start Consultation
+          {isStarting ? 'Requesting Access...' : 'Start Consultation'}
         </Button>
       </div>
     );
