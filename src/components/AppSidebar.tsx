@@ -10,7 +10,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, MessageSquare, LogOut } from "lucide-react";
+import { LayoutDashboard, MessageSquare, LogOut, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -37,6 +37,11 @@ export function AppSidebar() {
       title: "Chat",
       url: "/chat",
       icon: MessageSquare,
+    },
+    {
+      title: "Settings",
+      url: "/settings",
+      icon: Settings,
     },
   ];
 
@@ -77,5 +82,4 @@ export function AppSidebar() {
       </SidebarFooter>
     </Sidebar>
   );
-};
-
+}
