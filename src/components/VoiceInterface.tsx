@@ -1,16 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+
+import React, { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { RealtimeChat } from '@/utils/audio';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Play, 
-  Pause, 
-  StopCircle, 
-  Mic,
-  Download
-} from 'lucide-react';
+import { Mic } from 'lucide-react';
 import { toast } from 'sonner';
+import { useConsultation } from '@/hooks/useConsultation';
+import ConsultationControls from './ConsultationControls';
 
 interface VoiceInterfaceProps {
   onSpeakingChange: (speaking: boolean) => void;
@@ -18,11 +15,17 @@ interface VoiceInterfaceProps {
 
 const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => {
   const navigate = useNavigate();
-  const [isConnected, setIsConnected] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [isStarting, setIsStarting] = useState(false);
-  const [consultationId, setConsultationId] = useState<string | null>(null);
   const chatRef = useRef<RealtimeChat | null>(null);
+  const {
+    isConnected,
+    isPaused,
+    isStarting,
+    consultationId,
+    startConsultation,
+    pauseConsultation,
+    resumeConsultation,
+    endConsultation
+  } = useConsultation(onSpeakingChange);
 
   useEffect(() => {
     // Check authentication status
@@ -45,130 +48,28 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
     };
   }, [navigate]);
 
-  const handleMessage = (event: any) => {
-    console.log('Received message:', event);
-    
-    if (event.type === 'response.audio.delta') {
-      onSpeakingChange(true);
-    } else if (event.type === 'response.audio.done') {
-      onSpeakingChange(false);
-    }
-  };
-
-  const startConsultation = async () => {
-    try {
-      setIsStarting(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        navigate('/auth');
-        toast.error("Authentication required. Please sign in to use the voice features");
-        return;
-      }
-
-      // Create new consultation
-      const { data: consultation, error: consultationError } = await supabase
-        .from('consultations')
-        .insert({
-          user_id: session.user.id,
-          status: 'in_progress'
-        })
-        .select()
-        .single();
-
-      if (consultationError) throw consultationError;
-
-      setConsultationId(consultation.id);
-
-      chatRef.current = new RealtimeChat(handleMessage);
-      await chatRef.current.init();
-      setIsConnected(true);
-      setIsPaused(false);
-      
-      toast.success("Connected! Voice interface is ready");
-    } catch (error) {
-      console.error('Error starting consultation:', error);
-      if (error instanceof Error && error.message.includes('microphone')) {
-        toast.error(error.message);
-      } else {
-        toast.error(error instanceof Error ? error.message : 'Failed to start consultation');
-      }
-    } finally {
-      setIsStarting(false);
-    }
-  };
-
-  const pauseConsultation = async () => {
-    if (!consultationId) return;
-
-    try {
-      chatRef.current?.pause();
-      setIsPaused(true);
-
-      const { error } = await supabase
-        .from('consultations')
-        .update({ is_paused: true })
-        .eq('id', consultationId);
-
-      if (error) throw error;
-
-      toast.success("Consultation paused");
-    } catch (error) {
-      console.error('Error pausing consultation:', error);
-      toast.error("Failed to pause consultation");
-    }
-  };
-
-  const resumeConsultation = async () => {
-    if (!consultationId) return;
-
-    try {
-      chatRef.current?.resume();
-      setIsPaused(false);
-
-      const { error } = await supabase
-        .from('consultations')
-        .update({ is_paused: false })
-        .eq('id', consultationId);
-
-      if (error) throw error;
-
-      toast.success("Consultation resumed");
-    } catch (error) {
-      console.error('Error resuming consultation:', error);
-      toast.error("Failed to resume consultation");
-    }
-  };
-
-  const endConsultation = async () => {
-    if (!consultationId) return;
-
-    try {
+  useEffect(() => {
+    return () => {
       chatRef.current?.disconnect();
-      setIsConnected(false);
-      setIsPaused(false);
-      onSpeakingChange(false);
+    };
+  }, []);
 
-      const { error } = await supabase
-        .from('consultations')
-        .update({ status: 'completed' })
-        .eq('id', consultationId);
+  const handleStartConsultation = () => {
+    startConsultation(chatRef);
+  };
 
-      if (error) throw error;
+  const handlePauseConsultation = async () => {
+    chatRef.current?.pause();
+    await pauseConsultation();
+  };
 
-      // Generate document
-      const response = await supabase.functions.invoke('generate-document', {
-        body: { consultationId, type: 'pdf' }
-      });
+  const handleResumeConsultation = async () => {
+    chatRef.current?.resume();
+    await resumeConsultation();
+  };
 
-      if (response.error) throw response.error;
-
-      toast.success("Consultation completed and document generated");
-      setConsultationId(null);
-    } catch (error) {
-      console.error('Error ending consultation:', error);
-      toast.error("Failed to end consultation");
-    }
+  const handleEndConsultation = () => {
+    endConsultation(chatRef);
   };
 
   const downloadDocument = async () => {
@@ -191,17 +92,11 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
     }
   };
 
-  useEffect(() => {
-    return () => {
-      chatRef.current?.disconnect();
-    };
-  }, []);
-
   if (!isConnected) {
     return (
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4">
         <Button 
-          onClick={startConsultation}
+          onClick={handleStartConsultation}
           className="bg-[#9b87f5] hover:bg-[#7E69AB] text-white"
           disabled={isStarting}
         >
@@ -213,45 +108,14 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
   }
 
   return (
-    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4">
-      {isPaused ? (
-        <Button
-          onClick={resumeConsultation}
-          className="bg-[#9b87f5] hover:bg-[#7E69AB] text-white"
-        >
-          <Play className="w-4 h-4 mr-2" />
-          Resume
-        </Button>
-      ) : (
-        <Button
-          onClick={pauseConsultation}
-          className="bg-[#2A3041] hover:bg-[#1A1F2C] text-white"
-        >
-          <Pause className="w-4 h-4 mr-2" />
-          Pause
-        </Button>
-      )}
-
-      <Button
-        onClick={endConsultation}
-        variant="secondary"
-        className="bg-[#2A3041] text-white hover:bg-[#1A1F2C]"
-      >
-        <StopCircle className="w-4 h-4 mr-2" />
-        End
-      </Button>
-
-      {consultationId && (
-        <Button
-          onClick={downloadDocument}
-          variant="outline"
-          className="border-white/5 text-white hover:bg-[#2A3041]"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Download
-        </Button>
-      )}
-    </div>
+    <ConsultationControls
+      isPaused={isPaused}
+      onPause={handlePauseConsultation}
+      onResume={handleResumeConsultation}
+      onEnd={handleEndConsultation}
+      onDownload={downloadDocument}
+      consultationId={consultationId}
+    />
   );
 };
 
