@@ -134,7 +134,9 @@ export type Database = {
       user_settings: {
         Row: {
           auto_save: boolean | null
+          auto_transcribe: boolean | null
           created_at: string
+          default_doc_format: string | null
           id: string
           language: string | null
           updated_at: string
@@ -143,7 +145,9 @@ export type Database = {
         }
         Insert: {
           auto_save?: boolean | null
+          auto_transcribe?: boolean | null
           created_at?: string
+          default_doc_format?: string | null
           id?: string
           language?: string | null
           updated_at?: string
@@ -152,7 +156,9 @@ export type Database = {
         }
         Update: {
           auto_save?: boolean | null
+          auto_transcribe?: boolean | null
           created_at?: string
+          default_doc_format?: string | null
           id?: string
           language?: string | null
           updated_at?: string

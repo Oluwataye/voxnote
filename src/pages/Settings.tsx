@@ -14,6 +14,14 @@ import {
 import { Settings as SettingsIcon, FileType, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 
+interface UserSettings {
+  auto_save: boolean;
+  language: string;
+  voice_id: string;
+  default_doc_format: string;
+  auto_transcribe: boolean;
+}
+
 const Settings = () => {
   const [autoSave, setAutoSave] = useState(true);
   const [language, setLanguage] = useState("en");
@@ -34,18 +42,12 @@ const Settings = () => {
         .single();
 
       if (error) throw error;
-      return data;
+      return data as UserSettings;
     }
   });
 
   const updateSettingsMutation = useMutation({
-    mutationFn: async (settings: {
-      auto_save?: boolean;
-      language?: string;
-      voice_id?: string;
-      default_doc_format?: string;
-      auto_transcribe?: boolean;
-    }) => {
+    mutationFn: async (settings: Partial<UserSettings>) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
