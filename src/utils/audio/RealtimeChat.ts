@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { AudioRecorder } from "./AudioRecorder";
 import { encodeAudioData } from "./audioUtils";
@@ -16,12 +15,13 @@ export class RealtimeChat {
   private recorder: AudioRecorder | null = null;
   private audioContext: AudioContext;
   private isPaused: boolean = false;
+  private readonly SAMPLE_RATE = 24000;
 
   constructor(private onMessage: (message: RealtimeEvent) => void) {
     this.audioEl = document.createElement("audio");
     this.audioEl.autoplay = true;
     this.audioContext = new AudioContext({
-      sampleRate: 24000
+      sampleRate: this.SAMPLE_RATE
     });
   }
 
@@ -29,7 +29,7 @@ export class RealtimeChat {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
-          sampleRate: 24000,
+          sampleRate: this.SAMPLE_RATE,
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
@@ -72,10 +72,8 @@ export class RealtimeChat {
 
       this.pc.ontrack = async e => {
         const stream = e.streams[0];
-        // Create a new AudioContext with the same sample rate for the received stream
-        const streamAudioContext = new AudioContext({ sampleRate: 24000 });
-        const source = streamAudioContext.createMediaStreamSource(stream);
-        source.connect(streamAudioContext.destination);
+        const source = this.audioContext.createMediaStreamSource(stream);
+        source.connect(this.audioContext.destination);
       };
 
       ms.getTracks().forEach(track => this.pc?.addTrack(track, ms));
