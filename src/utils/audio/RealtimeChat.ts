@@ -43,10 +43,12 @@ export class RealtimeChat {
 
       this.pc = new RTCPeerConnection();
 
-      this.pc.ontrack = e => {
+      this.pc.ontrack = async e => {
         const stream = e.streams[0];
-        const source = this.audioContext.createMediaStreamSource(stream);
-        source.connect(this.audioContext.destination);
+        // Create a new AudioContext with the same sample rate for the received stream
+        const streamAudioContext = new AudioContext({ sampleRate: 24000 });
+        const source = streamAudioContext.createMediaStreamSource(stream);
+        source.connect(streamAudioContext.destination);
       };
 
       const ms = await navigator.mediaDevices.getUserMedia({ 
