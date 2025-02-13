@@ -3,51 +3,17 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MessageSquare, Download, Save, Mic, MicOff } from "lucide-react";
-import VoiceInterface from "@/components/VoiceInterface";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from "@/components/ui/button";
 
 const Dashboard = () => {
-  const [content, setContent] = useState("");
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [transcript, setTranscript] = useState("");
   const [consultationId, setConsultationId] = useState<string | null>(null);
 
-  const createConsultation = async (content: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-
-    const { data: consultation, error: consultationError } = await supabase
-      .from('consultations')
-      .insert({
-        original_language: 'en',
-        status: 'draft',
-        user_id: user.id
-      })
-      .select()
-      .single();
-
-    if (consultationError) throw consultationError;
-
-    const { error: contentError } = await supabase
-      .from('consultation_contents')
-      .insert([
-        {
-          consultation_id: consultation.id,
-          content,
-          language: 'en',
-          is_original: true
-        }
-      ]);
-
-    if (contentError) throw contentError;
-    
-    setConsultationId(consultation.id);
-    return consultation.id;
-  };
-
-  const { data: consultations } = useQuery({
+  const { data: consultations, refetch: refetchConsultations } = useQuery({
     queryKey: ['consultations'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -71,16 +37,54 @@ const Dashboard = () => {
     }
   });
 
-  const downloadDocument = async (consultationId: string, format: 'pdf' | 'docx') => {
+  const createConsultationMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
+
+      const { data: consultation, error: consultationError } = await supabase
+        .from('consultations')
+        .insert({
+          original_language: 'en',
+          status: 'draft',
+          user_id: user.id
+        })
+        .select()
+        .single();
+
+      if (consultationError) throw consultationError;
+
+      const { error: contentError } = await supabase
+        .from('consultation_contents')
+        .insert([{
+          consultation_id: consultation.id,
+          content,
+          language: 'en',
+          is_original: true
+        }]);
+
+      if (contentError) throw contentError;
+      return consultation.id;
+    },
+    onSuccess: (consultationId) => {
+      setConsultationId(consultationId);
+      refetchConsultations();
+      toast.success("Consultation saved successfully");
+    },
+    onError: (error) => {
+      toast.error("Failed to save consultation");
+      console.error("Error saving consultation:", error);
+    }
+  });
+
+  const downloadDocument = async (consultationId: string) => {
     try {
-      // Generate document in the specified format
       const response = await supabase.functions.invoke('generate-document', {
-        body: { consultationId, type: format }
+        body: { consultationId, type: 'docx' }
       });
 
       if (response.error) throw response.error;
 
-      // Update consultation with the new document URL
       const { data, error } = await supabase
         .from('consultations')
         .select('document_url')
@@ -91,10 +95,26 @@ const Dashboard = () => {
       if (!data.document_url) throw new Error('No document available');
 
       window.open(data.document_url, '_blank');
-      toast.success(`Downloaded ${format.toUpperCase()} document successfully`);
+      toast.success("Document downloaded successfully");
     } catch (error) {
       console.error('Error downloading document:', error);
-      toast.error(`Failed to download ${format.toUpperCase()} document`);
+      toast.error("Failed to download document");
+    }
+  };
+
+  const toggleRecording = () => {
+    setIsRecording(!isRecording);
+    if (!isRecording) {
+      setTranscript('');
+      setConsultationId(null);
+    }
+  };
+
+  const saveConsultation = async () => {
+    if (transcript) {
+      await createConsultationMutation.mutateAsync(transcript);
+      setTranscript('');
+      setIsRecording(false);
     }
   };
 
@@ -113,12 +133,21 @@ const Dashboard = () => {
           <Card className="bg-[#222837] border-white/5">
             <CardHeader>
               <CardTitle className="flex justify-between items-center text-white">
-                <span>Current Consultation</span>
-                <VoiceInterface onSpeakingChange={setIsSpeaking} />
+                <span>Medical Consultation Transcription</span>
+                <button
+                  onClick={toggleRecording}
+                  className={`p-2 rounded-full bg-[#2A3041] hover:bg-[#343B4F] transition-colors`}
+                >
+                  {isRecording ? (
+                    <MicOff className="w-6 h-6 text-red-400" />
+                  ) : (
+                    <Mic className="w-6 h-6 text-[#9b87f5]" />
+                  )}
+                </button>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isSpeaking && (
+              {isRecording && (
                 <Alert className="mb-4 bg-[#2A3041] border-[#9b87f5]/20">
                   <AlertDescription className="text-white">
                     Recording in progress... Speaking detected
@@ -126,15 +155,25 @@ const Dashboard = () => {
                 </Alert>
               )}
               <div className="min-h-[200px] p-4 bg-[#2A3041] rounded-lg border border-white/5">
-                {content || "Consultation notes will appear here in real-time..."}
+                {transcript || "Consultation notes will appear here in real-time..."}
               </div>
             </CardContent>
+            <CardFooter className="justify-end">
+              <Button
+                onClick={saveConsultation}
+                disabled={!transcript}
+                className="bg-[#9b87f5] hover:bg-[#7E69AB] text-white"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Save Consultation
+              </Button>
+            </CardFooter>
           </Card>
 
           {consultations && consultations.length > 0 && (
             <Card className="bg-[#222837] border-white/5">
               <CardHeader>
-                <CardTitle className="text-white">Consultation History</CardTitle>
+                <CardTitle className="text-white">Previous Consultations</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -144,26 +183,15 @@ const Dashboard = () => {
                         <div className="text-sm text-gray-400">
                           {new Date(consultation.created_at).toLocaleString()}
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => downloadDocument(consultation.id, 'pdf')}
-                            className="text-[#9b87f5] hover:text-[#7E69AB]"
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            PDF
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => downloadDocument(consultation.id, 'docx')}
-                            className="text-[#9b87f5] hover:text-[#7E69AB]"
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Word
-                          </Button>
-                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => downloadDocument(consultation.id)}
+                          className="text-[#9b87f5] hover:text-[#7E69AB]"
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Download Word
+                        </Button>
                       </div>
                       <div className="text-white/90">
                         {consultation.consultation_contents?.[0]?.content || 'No content available'}
