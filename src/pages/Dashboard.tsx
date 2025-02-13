@@ -2,18 +2,12 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { MessageSquare, Download, Save, Mic, MicOff } from "lucide-react";
 import VoiceInterface from "@/components/VoiceInterface";
-import { MessageSquare, Download } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from "@/components/ui/button";
 
 const Dashboard = () => {
   const [content, setContent] = useState("");
@@ -77,8 +71,16 @@ const Dashboard = () => {
     }
   });
 
-  const downloadDocument = async (consultationId: string) => {
+  const downloadDocument = async (consultationId: string, format: 'pdf' | 'docx') => {
     try {
+      // Generate document in the specified format
+      const response = await supabase.functions.invoke('generate-document', {
+        body: { consultationId, type: format }
+      });
+
+      if (response.error) throw response.error;
+
+      // Update consultation with the new document URL
       const { data, error } = await supabase
         .from('consultations')
         .select('document_url')
@@ -89,9 +91,10 @@ const Dashboard = () => {
       if (!data.document_url) throw new Error('No document available');
 
       window.open(data.document_url, '_blank');
+      toast.success(`Downloaded ${format.toUpperCase()} document successfully`);
     } catch (error) {
       console.error('Error downloading document:', error);
-      toast.error("Failed to download document");
+      toast.error(`Failed to download ${format.toUpperCase()} document`);
     }
   };
 
@@ -107,62 +110,82 @@ const Dashboard = () => {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-[#222837] rounded-2xl p-6 shadow-lg border border-white/5">
-            <h2 className="text-xl font-medium mb-4">Current Consultation</h2>
-            <div className="space-y-4">
-              <Textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className="min-h-[200px] bg-[#2A3041] border-white/5 focus:border-[#9b87f5] focus-visible:ring-[#9b87f5]/20 text-white placeholder:text-gray-400"
-                placeholder="Consultation notes will appear here in real-time..."
-              />
-            </div>
-          </div>
+          <Card className="bg-[#222837] border-white/5">
+            <CardHeader>
+              <CardTitle className="flex justify-between items-center text-white">
+                <span>Current Consultation</span>
+                <VoiceInterface onSpeakingChange={setIsSpeaking} />
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isSpeaking && (
+                <Alert className="mb-4 bg-[#2A3041] border-[#9b87f5]/20">
+                  <AlertDescription className="text-white">
+                    Recording in progress... Speaking detected
+                  </AlertDescription>
+                </Alert>
+              )}
+              <div className="min-h-[200px] p-4 bg-[#2A3041] rounded-lg border border-white/5">
+                {content || "Consultation notes will appear here in real-time..."}
+              </div>
+            </CardContent>
+          </Card>
 
           {consultations && consultations.length > 0 && (
-            <div className="bg-[#222837] rounded-2xl p-6 shadow-lg border border-white/5">
-              <h2 className="text-xl font-medium mb-4">Consultation History</h2>
-              <div className="space-y-4">
-                {consultations.map((consultation) => (
-                  <div key={consultation.id} className="p-4 bg-[#2A3041] rounded-xl">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-sm text-gray-400">
-                        {new Date(consultation.created_at).toLocaleString()}
+            <Card className="bg-[#222837] border-white/5">
+              <CardHeader>
+                <CardTitle className="text-white">Consultation History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {consultations.map((consultation) => (
+                    <div key={consultation.id} className="p-4 bg-[#2A3041] rounded-xl border border-white/5">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm text-gray-400">
+                          {new Date(consultation.created_at).toLocaleString()}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => downloadDocument(consultation.id, 'pdf')}
+                            className="text-[#9b87f5] hover:text-[#7E69AB]"
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            PDF
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => downloadDocument(consultation.id, 'docx')}
+                            className="text-[#9b87f5] hover:text-[#7E69AB]"
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Word
+                          </Button>
+                        </div>
                       </div>
-                      {consultation.document_url && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => downloadDocument(consultation.id)}
-                          className="text-[#9b87f5] hover:text-[#7E69AB]"
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Download
-                        </Button>
-                      )}
+                      <div className="text-white/90">
+                        {consultation.consultation_contents?.[0]?.content || 'No content available'}
+                      </div>
+                      <div className="mt-2 text-sm">
+                        <span className={`px-2 py-1 rounded-full ${
+                          consultation.status === 'completed' 
+                            ? 'bg-green-500/20 text-green-400'
+                            : consultation.status === 'in_progress'
+                            ? 'bg-blue-500/20 text-blue-400'
+                            : 'bg-gray-500/20 text-gray-400'
+                        }`}>
+                          {consultation.status}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-white/90">
-                      {consultation.consultation_contents?.[0]?.content || 'No content available'}
-                    </div>
-                    <div className="mt-2 text-sm">
-                      <span className={`px-2 py-1 rounded-full ${
-                        consultation.status === 'completed' 
-                          ? 'bg-green-500/20 text-green-400'
-                          : consultation.status === 'in_progress'
-                          ? 'bg-blue-500/20 text-blue-400'
-                          : 'bg-gray-500/20 text-gray-400'
-                      }`}>
-                        {consultation.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
-
-        <VoiceInterface onSpeakingChange={setIsSpeaking} />
       </div>
     </div>
   );
