@@ -39,10 +39,10 @@ const Settings = () => {
         .from('user_settings')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
-      return data as UserSettings;
+      return data as UserSettings | null;
     }
   });
 
@@ -56,6 +56,8 @@ const Settings = () => {
         .upsert({
           user_id: user.id,
           ...settings
+        }, {
+          onConflict: 'user_id'
         });
 
       if (error) throw error;
