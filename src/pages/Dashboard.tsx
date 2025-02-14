@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -42,44 +41,61 @@ const Dashboard = () => {
     }
   });
 
-  // Auto-scroll transcript viewport
-  useEffect(() => {
-    if (transcriptRef.current) {
-      transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
-    }
-  }, [transcript]);
-
-  // Handle real-time transcription messages
+  // Enhanced message handler with better logging and error handling
   const handleMessage = (event: any) => {
-    console.log('Received event:', event);
-    if (event.type === 'response.audio_transcript.delta') {
-      setTranscript(prev => prev + event.delta);
-    } else if (event.type === 'response.audio.delta') {
-      setIsSpeaking(true);
-    } else if (event.type === 'response.audio.done') {
-      setIsSpeaking(false);
+    console.log('Received transcription event:', event);
+    
+    try {
+      if (event.type === 'response.audio_transcript.delta') {
+        setTranscript(prev => {
+          const newTranscript = prev + event.delta;
+          console.log('Updated transcript:', newTranscript);
+          return newTranscript;
+        });
+      } else if (event.type === 'response.audio.delta') {
+        setIsSpeaking(true);
+      } else if (event.type === 'response.audio.done') {
+        setIsSpeaking(false);
+      } else if (event.type === 'error') {
+        console.error('Transcription error:', event);
+        toast.error("Error in transcription");
+      }
+    } catch (error) {
+      console.error('Error handling transcription message:', error);
     }
   };
 
-  // Initialize recording with proper error handling
+  // Enhanced recording start with better error handling
   const startRecording = async () => {
     try {
-      // Request microphone permissions
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(track => track.stop()); // Stop immediately as RealtimeChat will request again
+      // Request microphone permissions with specific constraints
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+          sampleRate: 24000
+        } 
+      });
+      stream.getTracks().forEach(track => track.stop());
 
       const newChat = new RealtimeChat(handleMessage);
       await newChat.init();
       setChat(newChat);
       setIsRecording(true);
       setTranscript('');
+      
+      console.log('Recording started successfully');
       toast.success("Recording started");
     } catch (error) {
       console.error('Error starting recording:', error);
       if (error instanceof DOMException && error.name === 'NotAllowedError') {
         toast.error("Microphone access denied. Please enable microphone access to use this feature.");
+      } else if (error instanceof DOMException && error.name === 'NotReadableError') {
+        toast.error("Unable to access your microphone. Please check your device connections.");
       } else {
-        toast.error("Failed to start recording. Please check your microphone connection.");
+        toast.error("Failed to start recording. Please try again.");
       }
     }
   };
@@ -175,6 +191,16 @@ const Dashboard = () => {
     };
   }, [chat]);
 
+  // Enhanced auto-scroll effect with smooth behavior
+  useEffect(() => {
+    if (transcriptRef.current) {
+      transcriptRef.current.scrollTo({
+        top: transcriptRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, [transcript]);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#1A1F2C] to-[#13151C] text-white">
       <div className="max-w-4xl mx-auto p-6">
@@ -213,12 +239,12 @@ const Dashboard = () => {
                     {isSpeaking ? (
                       <>
                         <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                        Speaking detected...
+                        <span className="animate-pulse">Speaking detected...</span>
                       </>
                     ) : (
                       <>
                         <div className="w-2 h-2 bg-red-400 rounded-full" />
-                        Waiting for speech...
+                        <span>Waiting for speech...</span>
                       </>
                     )}
                   </AlertDescription>
@@ -226,12 +252,14 @@ const Dashboard = () => {
               )}
               <div 
                 ref={transcriptRef}
-                className="min-h-[400px] max-h-[600px] p-6 bg-[#2A3041] rounded-lg border border-white/5 transition-all overflow-y-auto"
+                className="min-h-[400px] max-h-[600px] p-6 bg-[#2A3041] rounded-lg border border-white/5 transition-all overflow-y-auto font-mono"
               >
                 {transcript ? (
-                  <div className="whitespace-pre-wrap">{transcript}</div>
+                  <div className="whitespace-pre-wrap break-words leading-relaxed">
+                    {transcript}
+                  </div>
                 ) : (
-                  <div className="text-gray-400">
+                  <div className="text-gray-400 italic">
                     {isRecording 
                       ? "Start speaking to see the transcription in real-time..."
                       : "Click the microphone button to start recording your consultation..."

@@ -18,7 +18,7 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY is not set')
     }
 
-    // Request an ephemeral token from OpenAI
+    // Request an ephemeral token from OpenAI with specific medical transcription instructions
     const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
       method: "POST",
       headers: {
@@ -28,7 +28,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "gpt-4o-realtime-preview-2024-12-17",
         voice: "alloy",
-        instructions: "You are a medical transcription assistant. Focus on accurately capturing medical terminology, diagnoses, medications, and procedures. Keep responses professional and medical-focused."
+        instructions: "You are a medical transcription assistant specialized in real-time medical consultation transcription. Focus on accurately capturing medical terminology, diagnoses, treatments, and patient information. Maintain professional medical language and proper formatting. Ensure high accuracy in medical terms and maintain HIPAA compliance by not including any personally identifiable information unless explicitly stated."
       }),
     });
 
