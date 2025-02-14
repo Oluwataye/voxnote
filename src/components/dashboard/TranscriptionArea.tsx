@@ -95,7 +95,7 @@ export const TranscriptionArea = ({
         <Button
           onClick={onSave}
           disabled={!transcript || isRecording}
-          className="bg-[#9b87f5] hover:bg-[#7E69AB] text-white transition-all gap-2"
+          className="bg-[#9b87f5] hover:bg-[#7E69AB] text-white transition-all gap-2 disabled:bg-gray-600 disabled:text-gray-400"
         >
           <Save className="w-4 h-4" />
           Save Consultation
