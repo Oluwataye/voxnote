@@ -1,5 +1,4 @@
-
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -26,40 +25,44 @@ export const useConsultationData = () => {
   const [chat, setChat] = useState<RealtimeChat | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
 
-  // Query for fetching consultations
   const { data: consultations, refetch: refetchConsultations, isLoading } = useQuery({
     queryKey: ['consultations'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-      
-      const { data, error } = await supabase
-        .from('consultations')
-        .select(`
-          *,
-          consultation_contents (
-            content,
-            language,
-            created_at
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Not authenticated");
         
-      if (error) {
-        console.error("Error fetching consultations:", error);
-        throw error;
+        const { data, error } = await supabase
+          .from('consultations')
+          .select(`
+            *,
+            consultation_contents (
+              content,
+              language,
+              created_at
+            )
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+          
+        if (error) {
+          console.error("Error fetching consultations:", error);
+          throw error;
+        }
+        
+        return data || [];
+      } catch (error) {
+        console.error("Failed to fetch consultations:", error);
+        toast.error("Unable to load consultations. Please try again later.");
+        return [];
       }
-      
-      return data || [];
     }
   });
 
-  // Enhanced message handler with better logging and error handling
-  const handleMessage = (event: any) => {
-    console.log('Received transcription event:', event);
-    
+  const handleMessage = useCallback((event: any) => {
     try {
+      console.log('Received transcription event:', event);
+      
       if (event.type === 'response.audio_transcript.delta') {
         setTranscript(prev => {
           const newTranscript = prev + event.delta;
@@ -77,12 +80,10 @@ export const useConsultationData = () => {
     } catch (error) {
       console.error('Error handling transcription message:', error);
     }
-  };
+  }, []);
 
-  // Enhanced recording start with better error handling
   const startRecording = async () => {
     try {
-      // Request microphone permissions with specific constraints
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -132,13 +133,14 @@ export const useConsultationData = () => {
     }
   };
 
-  // Save consultation with proper HIPAA compliance considerations
   const saveConsultation = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      if (!user) {
+        toast.error("Authentication required");
+        throw new Error("Not authenticated");
+      }
 
-      // Create a new consultation record
       const { data: consultation, error: consultationError } = await supabase
         .from('consultations')
         .insert({
@@ -155,7 +157,6 @@ export const useConsultationData = () => {
         throw consultationError;
       }
 
-      // Add the transcript content to consultation_contents
       const { error: contentError } = await supabase
         .from('consultation_contents')
         .insert([{
@@ -170,7 +171,6 @@ export const useConsultationData = () => {
         throw contentError;
       }
 
-      // Generate Word document for editing
       await supabase.functions.invoke('generate-document', {
         body: { consultationId: consultation.id, type: 'docx' }
       });
@@ -185,7 +185,6 @@ export const useConsultationData = () => {
     }
   };
 
-  // Download consultation document
   const downloadDocument = async (consultationId: string) => {
     try {
       const { data, error } = await supabase
@@ -195,7 +194,10 @@ export const useConsultationData = () => {
         .single();
 
       if (error) throw error;
-      if (!data.document_url) throw new Error('Document not found');
+      if (!data.document_url) {
+        toast.error("Document not available yet");
+        throw new Error('Document not found');
+      }
 
       window.open(data.document_url, '_blank');
     } catch (error) {
