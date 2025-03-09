@@ -9,7 +9,6 @@ import { supabase } from "./integrations/supabase/client";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./components/AppSidebar";
 import Dashboard from "./pages/Dashboard";
-import Chat from "./pages/Chat";
 import Auth from "./pages/Auth";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -56,16 +55,6 @@ const App = () => {
                     element={
                       isAuthenticated ? (
                         <Dashboard />
-                      ) : (
-                        <Navigate to="/auth" replace />
-                      )
-                    }
-                  />
-                  <Route
-                    path="/chat"
-                    element={
-                      isAuthenticated ? (
-                        <Chat />
                       ) : (
                         <Navigate to="/auth" replace />
                       )
