@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -16,7 +17,7 @@ const Dashboard = () => {
   const transcriptRef = useRef<HTMLDivElement>(null);
 
   // Query for fetching consultations
-  const { data: consultations, refetch: refetchConsultations } = useQuery({
+  const { data: consultations, refetch: refetchConsultations, isLoading } = useQuery({
     queryKey: ['consultations'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -35,8 +36,13 @@ const Dashboard = () => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
         
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error("Error fetching consultations:", error);
+        throw error;
+      }
+      
+      console.log("Fetched consultations:", data);
+      return data || [];
     }
   });
 
@@ -123,6 +129,7 @@ const Dashboard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Create a new consultation record
       const { data: consultation, error: consultationError } = await supabase
         .from('consultations')
         .insert({
@@ -134,8 +141,12 @@ const Dashboard = () => {
         .select()
         .single();
 
-      if (consultationError) throw consultationError;
+      if (consultationError) {
+        console.error("Error creating consultation:", consultationError);
+        throw consultationError;
+      }
 
+      // Add the transcript content to consultation_contents
       const { error: contentError } = await supabase
         .from('consultation_contents')
         .insert([{
@@ -145,7 +156,10 @@ const Dashboard = () => {
           is_original: true
         }]);
 
-      if (contentError) throw contentError;
+      if (contentError) {
+        console.error("Error adding consultation content:", contentError);
+        throw contentError;
+      }
 
       // Generate Word document for editing
       await supabase.functions.invoke('generate-document', {
@@ -190,16 +204,6 @@ const Dashboard = () => {
     };
   }, [chat]);
 
-  // Enhanced auto-scroll effect with smooth behavior
-  useEffect(() => {
-    if (transcriptRef.current) {
-      transcriptRef.current.scrollTo({
-        top: transcriptRef.current.scrollHeight,
-        behavior: 'smooth'
-      });
-    }
-  }, [transcript]);
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#1A1F2C] to-[#13151C] text-white p-6">
       <div className="max-w-5xl mx-auto space-y-8">
@@ -218,6 +222,7 @@ const Dashboard = () => {
           <RecentConsultations
             consultations={consultations || []}
             onDownload={downloadDocument}
+            isLoading={isLoading}
           />
         </div>
       </div>

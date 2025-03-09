@@ -3,7 +3,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from "@/components/ui/button";
 import { Save, Mic, MicOff } from "lucide-react";
-import { RefObject } from 'react';
+import { RefObject, useEffect } from 'react';
 
 interface TranscriptionAreaProps {
   isRecording: boolean;
@@ -22,8 +22,18 @@ export const TranscriptionArea = ({
   onToggleRecording,
   onSave,
 }: TranscriptionAreaProps) => {
+  // Auto-scroll effect when transcript updates
+  useEffect(() => {
+    if (transcriptRef.current && transcript) {
+      transcriptRef.current.scrollTo({
+        top: transcriptRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, [transcript, transcriptRef]);
+
   return (
-    <Card className="bg-[#222837] border-white/5">
+    <Card className="bg-[#222837] border-white/5 fluid-transition">
       <CardHeader className="space-y-0">
         <CardTitle className="flex justify-between items-center text-white">
           <div className="flex items-center gap-2">
@@ -79,7 +89,7 @@ export const TranscriptionArea = ({
           className="min-h-[400px] max-h-[600px] p-6 bg-[#2A3041] rounded-lg border border-white/5 transition-all overflow-y-auto font-mono text-sm leading-relaxed"
         >
           {transcript ? (
-            <div className="whitespace-pre-wrap break-words">
+            <div className="whitespace-pre-wrap break-words text-white/90">
               {transcript}
             </div>
           ) : (
@@ -95,7 +105,7 @@ export const TranscriptionArea = ({
         <Button
           onClick={onSave}
           disabled={!transcript || isRecording}
-          className="bg-[#9b87f5] hover:bg-[#7E69AB] text-white transition-all gap-2 disabled:bg-gray-600 disabled:text-gray-400"
+          className="bg-[#9b87f5] hover:bg-[#7E69AB] text-white transition-all gap-2 disabled:opacity-50 disabled:pointer-events-none"
         >
           <Save className="w-4 h-4" />
           Save Consultation
