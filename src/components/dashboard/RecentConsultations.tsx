@@ -13,6 +13,7 @@ interface Consultation {
   id: string;
   created_at: string;
   consultation_contents?: ConsultationContent[];
+  document_url?: string | null;
 }
 
 interface RecentConsultationsProps {
