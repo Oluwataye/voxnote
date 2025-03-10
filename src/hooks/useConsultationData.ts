@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback } from "react";
+
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -24,6 +25,17 @@ export const useConsultationData = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [chat, setChat] = useState<RealtimeChat | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
+  const micPermissionChecked = useRef(false);
+
+  // Add cleanup effect for WebRTC connections
+  useEffect(() => {
+    return () => {
+      if (chat) {
+        chat.disconnect();
+        setChat(null);
+      }
+    };
+  }, [chat]);
 
   const { data: consultations, refetch: refetchConsultations, isLoading } = useQuery({
     queryKey: ['consultations'],
@@ -82,7 +94,9 @@ export const useConsultationData = () => {
     }
   }, []);
 
-  const startRecording = async () => {
+  const checkMicrophonePermission = async () => {
+    if (micPermissionChecked.current) return true;
+    
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -93,8 +107,31 @@ export const useConsultationData = () => {
           sampleRate: 24000
         } 
       });
+      
+      // Stop the tracks after checking permission
       stream.getTracks().forEach(track => track.stop());
+      micPermissionChecked.current = true;
+      return true;
+    } catch (error) {
+      console.error('Microphone permission error:', error);
+      if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        toast.error("Microphone access denied. Please enable microphone access to use this feature.");
+      } else if (error instanceof DOMException && error.name === 'NotReadableError') {
+        toast.error("Unable to access your microphone. Please check your device connections.");
+      } else {
+        toast.error("Failed to access microphone. Please try again.");
+      }
+      return false;
+    }
+  };
 
+  const startRecording = async () => {
+    try {
+      // Check for microphone permissions first
+      const hasPermission = await checkMicrophonePermission();
+      if (!hasPermission) return;
+      
+      // Initialize the real-time chat
       const newChat = new RealtimeChat(handleMessage);
       await newChat.init();
       setChat(newChat);

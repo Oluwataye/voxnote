@@ -48,9 +48,12 @@ export const TranscriptionArea = ({
             onClick={onToggleRecording}
             variant={isRecording ? "destructive" : "default"}
             size="icon"
-            className={`rounded-full transition-all duration-200 ${
-              isRecording ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-[#9b87f5] hover:bg-[#8674d4]'
+            className={`rounded-full transition-all duration-300 ${
+              isRecording 
+                ? 'bg-red-500 hover:bg-red-600 text-white' 
+                : 'bg-[#9b87f5] hover:bg-[#8674d4] text-white'
             }`}
+            aria-label={isRecording ? "Stop recording" : "Start recording"}
           >
             {isRecording ? (
               <MicOff className="w-5 h-5" />
