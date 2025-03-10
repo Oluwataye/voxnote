@@ -1,8 +1,9 @@
+
 import { useEffect } from "react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { TranscriptionArea } from "@/components/dashboard/TranscriptionArea";
 import { RecentConsultations } from "@/components/dashboard/RecentConsultations";
-import { useConsultationData } from "@/hooks/useConsultationData";
+import { useConsultationData } from "@/hooks/consultation";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 
@@ -19,10 +20,10 @@ const Dashboard = () => {
     downloadDocument,
   } = useConsultationData();
 
-  // Clean up WebRTC connections (moved from previous useEffect)
+  // This is kept as a placeholder for any future cleanup
   useEffect(() => {
     return () => {
-      // This is handled inside the hook now, but we keep this for any future cleanup
+      // This is handled inside the hook now
     };
   }, []);
 
