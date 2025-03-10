@@ -11,6 +11,7 @@ export const useConsultationData = () => {
     transcriptRef,
     toggleRecording,
     resetTranscript,
+    clearTranscript,
     cleanup
   } = useTranscription();
 
@@ -42,6 +43,7 @@ export const useConsultationData = () => {
     transcript,
     transcriptRef,
     toggleRecording,
+    clearTranscript,
     
     // Consultation storage related
     consultations,

@@ -114,6 +114,12 @@ export const useTranscription = () => {
     setTranscript('');
   };
 
+  // Add the new clearTranscript function that doesn't stop recording
+  const clearTranscript = () => {
+    setTranscript('');
+    toast.success("Transcription cleared");
+  };
+
   // Cleanup for WebRTC connections
   const cleanup = () => {
     if (chat) {
@@ -129,6 +135,7 @@ export const useTranscription = () => {
     transcriptRef,
     toggleRecording,
     resetTranscript,
+    clearTranscript,
     cleanup
   };
 };

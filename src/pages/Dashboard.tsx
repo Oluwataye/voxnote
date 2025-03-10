@@ -18,6 +18,7 @@ const Dashboard = () => {
     toggleRecording,
     saveConsultation,
     downloadDocument,
+    clearTranscript,
   } = useConsultationData();
 
   // This is kept as a placeholder for any future cleanup
@@ -42,6 +43,7 @@ const Dashboard = () => {
             transcriptRef={transcriptRef}
             onToggleRecording={toggleRecording}
             onSave={saveConsultation}
+            onClear={clearTranscript}
           />
         </ErrorBoundary>
 

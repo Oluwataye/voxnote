@@ -2,7 +2,7 @@
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from "@/components/ui/button";
-import { Save, Mic, MicOff } from "lucide-react";
+import { Save, Mic, MicOff, Eraser } from "lucide-react";
 import { RefObject, useEffect } from 'react';
 
 interface TranscriptionAreaProps {
@@ -12,6 +12,7 @@ interface TranscriptionAreaProps {
   transcriptRef: RefObject<HTMLDivElement>;
   onToggleRecording: () => void;
   onSave: () => void;
+  onClear?: () => void;
 }
 
 export const TranscriptionArea = ({
@@ -21,6 +22,7 @@ export const TranscriptionArea = ({
   transcriptRef,
   onToggleRecording,
   onSave,
+  onClear,
 }: TranscriptionAreaProps) => {
   // Auto-scroll effect when transcript updates
   useEffect(() => {
@@ -44,23 +46,37 @@ export const TranscriptionArea = ({
               </span>
             )}
           </div>
-          <Button
-            onClick={onToggleRecording}
-            variant={isRecording ? "destructive" : "default"}
-            size="icon"
-            className={`rounded-full transition-all duration-300 ${
-              isRecording 
-                ? 'bg-red-500 hover:bg-red-600 text-white' 
-                : 'bg-[#9b87f5] hover:bg-[#8674d4] text-white'
-            }`}
-            aria-label={isRecording ? "Stop recording" : "Start recording"}
-          >
-            {isRecording ? (
-              <MicOff className="w-5 h-5" />
-            ) : (
-              <Mic className="w-5 h-5" />
+          <div className="flex items-center gap-2">
+            {isRecording && transcript && (
+              <Button
+                onClick={onClear}
+                variant="outline"
+                size="icon"
+                className="rounded-full bg-transparent border-white/10 hover:bg-white/10 text-white"
+                aria-label="Clear transcription"
+                title="Clear transcription text"
+              >
+                <Eraser className="w-4 h-4" />
+              </Button>
             )}
-          </Button>
+            <Button
+              onClick={onToggleRecording}
+              variant={isRecording ? "destructive" : "default"}
+              size="icon"
+              className={`rounded-full transition-all duration-300 ${
+                isRecording 
+                  ? 'bg-red-500 hover:bg-red-600 text-white' 
+                  : 'bg-[#9b87f5] hover:bg-[#8674d4] text-white'
+              }`}
+              aria-label={isRecording ? "Stop recording" : "Start recording"}
+            >
+              {isRecording ? (
+                <MicOff className="w-5 h-5" />
+              ) : (
+                <Mic className="w-5 h-5" />
+              )}
+            </Button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
