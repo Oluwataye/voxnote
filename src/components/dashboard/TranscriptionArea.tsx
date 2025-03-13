@@ -26,6 +26,7 @@ export const TranscriptionArea = ({
   onClear,
 }: TranscriptionAreaProps) => {
   const [isCardAnimated, setIsCardAnimated] = useState(false);
+  const [isAccessingMic, setIsAccessingMic] = useState(false);
 
   // Auto-scroll effect when transcript updates
   useEffect(() => {
@@ -45,6 +46,19 @@ export const TranscriptionArea = ({
       return () => clearTimeout(timer);
     }
   }, [isRecording]);
+
+  const handleMicrophoneClick = async () => {
+    if (!isRecording) {
+      setIsAccessingMic(true);
+      try {
+        await onToggleRecording();
+      } finally {
+        setIsAccessingMic(false);
+      }
+    } else {
+      onToggleRecording();
+    }
+  };
 
   return (
     <Card 
@@ -79,20 +93,28 @@ export const TranscriptionArea = ({
               </Button>
             )}
             <Button
-              onClick={onToggleRecording}
+              onClick={handleMicrophoneClick}
               variant={isRecording ? "destructive" : "default"}
               size="icon"
               className={`rounded-full transition-all duration-300 shadow-md ${
+                isAccessingMic ? 'opacity-70 pointer-events-none' : ''
+              } ${
                 isRecording 
                   ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' 
                   : 'bg-[#9b87f5] hover:bg-[#8674d4] text-white hover:scale-105'
               }`}
               aria-label={isRecording ? "Stop recording" : "Start recording"}
+              disabled={isAccessingMic}
             >
               {isRecording ? (
                 <MicOff className="w-5 h-5" />
               ) : (
-                <Mic className="w-5 h-5" />
+                <div className={cn(
+                  "relative",
+                  isAccessingMic && "animate-spin"
+                )}>
+                  <Mic className="w-5 h-5" />
+                </div>
               )}
             </Button>
           </div>

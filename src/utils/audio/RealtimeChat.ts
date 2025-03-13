@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { AudioRecorder } from "./AudioRecorder";
 import { encodeAudioData } from "./audioUtils";
@@ -16,6 +17,7 @@ export class RealtimeChat {
   private audioContext: AudioContext;
   private isPaused: boolean = false;
   private readonly SAMPLE_RATE = 24000;
+  private microphoneStream: MediaStream | null = null;
 
   constructor(private onMessage: (message: RealtimeEvent) => void) {
     this.audioEl = document.createElement("audio");
@@ -27,6 +29,7 @@ export class RealtimeChat {
 
   private async requestMicrophonePermission(): Promise<MediaStream> {
     try {
+      console.log('Requesting microphone permission...');
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           sampleRate: this.SAMPLE_RATE,
@@ -36,13 +39,31 @@ export class RealtimeChat {
           autoGainControl: true
         } 
       });
+      
+      // Verify we have audio tracks and they're enabled
+      const audioTrack = stream.getAudioTracks()[0];
+      if (!audioTrack) {
+        throw new Error('No audio track found in the stream');
+      }
+      
+      if (!audioTrack.enabled) {
+        audioTrack.enabled = true;
+        if (!audioTrack.enabled) {
+          throw new Error('Could not enable audio track');
+        }
+      }
+      
+      console.log('Microphone permission granted', audioTrack.label);
       return stream;
     } catch (error) {
+      console.error('Error requesting microphone permission:', error);
       if (error instanceof DOMException) {
         if (error.name === 'NotAllowedError') {
           throw new Error('Microphone access denied. Please allow microphone access to use the voice features.');
         } else if (error.name === 'NotFoundError') {
           throw new Error('No microphone found. Please connect a microphone to use the voice features.');
+        } else if (error.name === 'NotReadableError') {
+          throw new Error('Cannot access microphone. It may be in use by another application.');
         }
       }
       throw error;
@@ -66,17 +87,28 @@ export class RealtimeChat {
       const EPHEMERAL_KEY = data.client_secret.value;
 
       // Request microphone permission first
-      const ms = await this.requestMicrophonePermission();
+      this.microphoneStream = await this.requestMicrophonePermission();
 
-      this.pc = new RTCPeerConnection();
+      // Create RTCPeerConnection for WebRTC
+      this.pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      });
 
       this.pc.ontrack = async e => {
+        console.log('Received remote track', e.streams[0]);
         const stream = e.streams[0];
         const source = this.audioContext.createMediaStreamSource(stream);
         source.connect(this.audioContext.destination);
       };
 
-      ms.getTracks().forEach(track => this.pc?.addTrack(track, ms));
+      // Add all tracks from our microphone stream to the peer connection
+      this.microphoneStream.getTracks().forEach(track => {
+        console.log(`Adding track to peer connection: ${track.kind} (${track.label})`);
+        this.pc?.addTrack(track, this.microphoneStream!);
+      });
 
       this.dc = this.pc.createDataChannel("oai-events");
       this.dc.addEventListener("message", (e) => {
@@ -116,10 +148,22 @@ export class RealtimeChat {
         }
       });
       await this.recorder.start();
+      console.log("Audio recorder started");
 
     } catch (error) {
       console.error("Error initializing chat:", error);
+      this.cleanup();
       throw error;
+    }
+  }
+
+  private cleanup() {
+    if (this.microphoneStream) {
+      this.microphoneStream.getTracks().forEach(track => {
+        track.stop();
+        console.log(`Stopped track: ${track.kind} (${track.label})`);
+      });
+      this.microphoneStream = null;
     }
   }
 
@@ -162,10 +206,12 @@ export class RealtimeChat {
 
   disconnect() {
     this.recorder?.stop();
+    this.cleanup();
     this.dc?.close();
     this.pc?.close();
-    if (this.audioContext.state !== 'closed') {
+    if (this.audioContext && this.audioContext.state !== 'closed') {
       this.audioContext.close();
     }
+    console.log("Chat disconnected and resources cleaned up");
   }
 }

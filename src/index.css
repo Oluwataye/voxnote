@@ -87,7 +87,49 @@
   animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* Mic button animation */
+@keyframes mic-ping {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  75%, 100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.animate-mic-ping {
+  animation: mic-ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Recording pulse for microphone */
+@keyframes recording-pulse {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+.animate-recording-pulse {
+  animation: recording-pulse 2s ease-in-out infinite;
+}
+
 /* Glass morphism utility */
 .glass-panel {
   @apply bg-white/10 backdrop-blur-lg border border-white/20 shadow-lg;
+}
+
+/* Mic accessing animation */
+@keyframes accessing {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-accessing {
+  animation: accessing 1s linear infinite;
 }

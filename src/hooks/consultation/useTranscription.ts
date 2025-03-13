@@ -35,9 +35,8 @@ export const useTranscription = () => {
   }, []);
 
   const checkMicrophonePermission = async () => {
-    if (micPermissionChecked.current) return true;
-    
     try {
+      // Request microphone with high-quality settings for better transcription
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -48,18 +47,26 @@ export const useTranscription = () => {
         } 
       });
       
-      // Stop the tracks after checking permission
+      // Test if we can actually access the mic by checking track readiness
+      const audioTrack = stream.getAudioTracks()[0];
+      if (!audioTrack || !audioTrack.enabled) {
+        throw new Error('Could not enable audio track');
+      }
+      
+      // Only stop tracks after successfully confirming mic access
       stream.getTracks().forEach(track => track.stop());
       micPermissionChecked.current = true;
       return true;
     } catch (error) {
       console.error('Microphone permission error:', error);
       if (error instanceof DOMException && error.name === 'NotAllowedError') {
-        toast.error("Microphone access denied. Please enable microphone access to use this feature.");
+        toast.error("Microphone access denied. Please enable microphone access in your browser settings.");
       } else if (error instanceof DOMException && error.name === 'NotReadableError') {
-        toast.error("Unable to access your microphone. Please check your device connections.");
+        toast.error("Unable to access your microphone. Please check your device connections or try using another microphone.");
+      } else if (error instanceof DOMException && error.name === 'NotFoundError') {
+        toast.error("No microphone detected. Please connect a microphone to your device.");
       } else {
-        toast.error("Failed to access microphone. Please try again.");
+        toast.error("Failed to access microphone. Please try again or check your device settings.");
       }
       return false;
     }
@@ -69,7 +76,7 @@ export const useTranscription = () => {
     try {
       // Check for microphone permissions first
       const hasPermission = await checkMicrophonePermission();
-      if (!hasPermission) return;
+      if (!hasPermission) return false;
       
       // Initialize the real-time chat
       const newChat = new RealtimeChat(handleMessage);
@@ -80,15 +87,19 @@ export const useTranscription = () => {
       
       console.log('Recording started successfully');
       toast.success("Recording started");
+      return true;
     } catch (error) {
       console.error('Error starting recording:', error);
       if (error instanceof DOMException && error.name === 'NotAllowedError') {
-        toast.error("Microphone access denied. Please enable microphone access to use this feature.");
+        toast.error("Microphone access denied. Please enable microphone access in your browser settings.");
       } else if (error instanceof DOMException && error.name === 'NotReadableError') {
         toast.error("Unable to access your microphone. Please check your device connections.");
+      } else if (error instanceof DOMException && error.name === 'NotFoundError') {
+        toast.error("No microphone detected. Please connect a microphone to your device.");
       } else {
         toast.error("Failed to start recording. Please try again.");
       }
+      return false;
     }
   };
 
@@ -99,14 +110,16 @@ export const useTranscription = () => {
       setIsRecording(false);
       setIsSpeaking(false);
       toast.success("Recording completed");
+      return true;
     }
+    return false;
   };
 
-  const toggleRecording = () => {
+  const toggleRecording = async () => {
     if (isRecording) {
-      stopRecording();
+      return stopRecording();
     } else {
-      startRecording();
+      return startRecording();
     }
   };
 
