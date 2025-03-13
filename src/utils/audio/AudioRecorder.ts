@@ -5,11 +5,19 @@ export class AudioRecorder {
   private processor: ScriptProcessorNode | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
   private audioProcessor: any = null;
+  private isRecording: boolean = false;
 
   constructor(private onAudioData: (audioData: Float32Array) => void) {}
 
   async start() {
+    if (this.isRecording) {
+      console.log('Already recording');
+      return;
+    }
+
     try {
+      this.isRecording = true;
+      
       // Request microphone access with optimal settings for voice clarity
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -27,6 +35,9 @@ export class AudioRecorder {
         throw new Error('Could not enable audio track');
       }
       
+      // Additional log to check what microphone we're using
+      console.log(`Using microphone: ${audioTrack.label}`);
+      
       // Create audio context optimized for voice
       this.audioContext = new AudioContext({
         sampleRate: 24000,
@@ -34,22 +45,13 @@ export class AudioRecorder {
       
       this.source = this.audioContext.createMediaStreamSource(this.stream);
       
-      // Modern browsers support AudioWorklet, but fall back to ScriptProcessor
-      if (this.audioContext.audioWorklet) {
-        try {
-          // Try to use AudioWorklet for better performance
-          await this.setupAudioWorklet();
-        } catch (error) {
-          console.warn('AudioWorklet not available, falling back to ScriptProcessor', error);
-          this.setupScriptProcessor();
-        }
-      } else {
-        this.setupScriptProcessor();
-      }
+      // We'll always use ScriptProcessor for better compatibility
+      this.setupScriptProcessor();
       
       // Track successful initialization
       console.log('Audio recorder initialized successfully');
     } catch (error) {
+      this.isRecording = false;
       console.error('Error accessing microphone:', error);
       throw error;
     }
@@ -57,34 +59,43 @@ export class AudioRecorder {
   
   private setupScriptProcessor() {
     if (!this.audioContext || !this.source) return;
+    
+    // Create processor with optimal buffer size for voice
     this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
     this.processor.onaudioprocess = (e) => {
+      // Only process audio if we're recording
+      if (!this.isRecording) return;
+      
       const inputData = e.inputBuffer.getChannelData(0);
-      this.onAudioData(new Float32Array(inputData));
+      // Create a copy of the data to avoid reference issues
+      const audioData = new Float32Array(inputData);
+      this.onAudioData(audioData);
     };
+    
+    // Connect the audio processing graph
     this.source.connect(this.processor);
     this.processor.connect(this.audioContext.destination);
-  }
-  
-  private async setupAudioWorklet() {
-    // This is a fallback option for future implementation
-    // For now, we'll just use ScriptProcessor
-    this.setupScriptProcessor();
+    console.log('Audio processor connected and ready');
   }
 
   stop() {
+    this.isRecording = false;
+    
     if (this.source) {
       this.source.disconnect();
       this.source = null;
     }
+    
     if (this.processor) {
       this.processor.disconnect();
       this.processor = null;
     }
+    
     if (this.audioProcessor) {
       this.audioProcessor.disconnect();
       this.audioProcessor = null;
     }
+    
     if (this.stream) {
       this.stream.getTracks().forEach(track => {
         track.stop();
@@ -92,10 +103,16 @@ export class AudioRecorder {
       });
       this.stream = null;
     }
+    
     if (this.audioContext) {
       this.audioContext.close();
       this.audioContext = null;
     }
+    
     console.log('Audio recorder stopped and cleaned up');
+  }
+  
+  isActive(): boolean {
+    return this.isRecording;
   }
 }

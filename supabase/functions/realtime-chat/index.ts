@@ -19,6 +19,7 @@ serve(async (req) => {
     }
 
     // Request an ephemeral token from OpenAI with specific medical transcription instructions
+    // Updated to use a valid model: gpt-4o
     const response = await fetch("https://api.openai.com/v1/realtime/sessions", {
       method: "POST",
       headers: {
@@ -26,7 +27,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-realtime-preview-2024-12-17",
+        model: "gpt-4o",
         voice: "alloy",
         instructions: "You are a medical transcription assistant specialized in real-time medical consultation transcription. Focus on accurately capturing medical terminology, diagnoses, treatments, and patient information. Maintain professional medical language and proper formatting. Ensure high accuracy in medical terms and maintain HIPAA compliance by not including any personally identifiable information unless explicitly stated."
       }),

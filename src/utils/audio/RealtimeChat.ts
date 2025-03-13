@@ -18,6 +18,7 @@ export class RealtimeChat {
   private isPaused: boolean = false;
   private readonly SAMPLE_RATE = 24000;
   private microphoneStream: MediaStream | null = null;
+  private connectionActive: boolean = false;
 
   constructor(private onMessage: (message: RealtimeEvent) => void) {
     this.audioEl = document.createElement("audio");
@@ -85,17 +86,32 @@ export class RealtimeChat {
       }
 
       const EPHEMERAL_KEY = data.client_secret.value;
+      console.log("Got ephemeral token, connecting to OpenAI...");
 
       // Request microphone permission first
       this.microphoneStream = await this.requestMicrophonePermission();
 
-      // Create RTCPeerConnection for WebRTC
+      // Create RTCPeerConnection for WebRTC with more robust configuration
       this.pc = new RTCPeerConnection({
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
-        ]
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' }
+        ],
+        iceCandidatePoolSize: 10
       });
+
+      // Add connection state change monitoring
+      this.pc.onconnectionstatechange = () => {
+        console.log("Connection state changed:", this.pc?.connectionState);
+        if (this.pc?.connectionState === 'connected') {
+          this.connectionActive = true;
+        } else if (['disconnected', 'failed', 'closed'].includes(this.pc?.connectionState || '')) {
+          this.connectionActive = false;
+        }
+      };
 
       this.pc.ontrack = async e => {
         console.log('Received remote track', e.streams[0]);
@@ -120,8 +136,11 @@ export class RealtimeChat {
       const offer = await this.pc.createOffer();
       await this.pc.setLocalDescription(offer);
 
+      // Log the model being used
+      console.log(`Using model: ${data.model || 'gpt-4o'}`);
+      
       const baseUrl = "https://api.openai.com/v1/realtime";
-      const model = "gpt-4o-realtime-preview-2024-12-17";
+      const model = data.model || "gpt-4o"; // Get the model from the session or use gpt-4o as fallback
       const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
         method: "POST",
         body: offer.sdp,
@@ -130,6 +149,12 @@ export class RealtimeChat {
           "Content-Type": "application/sdp"
         },
       });
+
+      if (!sdpResponse.ok) {
+        const errorText = await sdpResponse.text();
+        console.error("SDP response error:", errorText);
+        throw new Error(`Failed to establish connection: ${errorText}`);
+      }
 
       const answer = {
         type: "answer" as RTCSdpType,
@@ -140,13 +165,14 @@ export class RealtimeChat {
       console.log("WebRTC connection established");
 
       this.recorder = new AudioRecorder((audioData) => {
-        if (this.dc?.readyState === 'open') {
+        if (this.dc?.readyState === 'open' && !this.isPaused) {
           this.dc.send(JSON.stringify({
             type: 'input_audio_buffer.append',
             audio: encodeAudioData(audioData)
           }));
         }
       });
+      
       await this.recorder.start();
       console.log("Audio recorder started");
 
@@ -204,14 +230,29 @@ export class RealtimeChat {
     }
   }
 
+  isConnected() {
+    return this.connectionActive && this.dc?.readyState === 'open';
+  }
+
   disconnect() {
+    this.connectionActive = false;
     this.recorder?.stop();
     this.cleanup();
-    this.dc?.close();
-    this.pc?.close();
+    
+    if (this.dc) {
+      this.dc.close();
+      this.dc = null;
+    }
+    
+    if (this.pc) {
+      this.pc.close();
+      this.pc = null;
+    }
+    
     if (this.audioContext && this.audioContext.state !== 'closed') {
       this.audioContext.close();
     }
+    
     console.log("Chat disconnected and resources cleaned up");
   }
 }
