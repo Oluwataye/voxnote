@@ -1,173 +1,224 @@
-
-import { encodeAudioData } from "./audioUtils";
 import { RealtimeEvent } from "./types";
 
 export class WebRTCManager {
-  private pc: RTCPeerConnection | null = null;
-  private dc: RTCDataChannel | null = null;
-  private audioEl: HTMLAudioElement;
-  private audioContext: AudioContext;
-  private connectionActive: boolean = false;
-  
+  private peerConnection: RTCPeerConnection | null = null;
+  private dataChannel: RTCDataChannel | null = null;
+  private audioSender: RTCRtpSender | null = null;
+  private isAudioPaused: boolean = false;
+  private isConnectionEstablished: boolean = false;
+  private mediaStream: MediaStream | null = null;
+
   constructor(
-    private readonly onMessage: (message: RealtimeEvent) => void,
-    private readonly sampleRate: number
-  ) {
-    this.audioEl = document.createElement("audio");
-    this.audioEl.autoplay = true;
-    this.audioContext = new AudioContext({
-      sampleRate: this.sampleRate
-    });
+    private onMessage: (message: RealtimeEvent) => void,
+    private sampleRate: number = 24000
+  ) {}
+
+  /**
+   * Add media stream tracks to the peer connection
+   * This must be called BEFORE setupConnection
+   */
+  addTracks(stream: MediaStream): void {
+    try {
+      if (!stream) {
+        console.error("Cannot add tracks: No stream provided");
+        return;
+      }
+
+      this.mediaStream = stream;
+      
+      // Create peer connection if it doesn't exist
+      if (!this.peerConnection) {
+        this.createPeerConnection();
+      }
+      
+      const audioTracks = stream.getAudioTracks();
+      if (!audioTracks || audioTracks.length === 0) {
+        throw new Error("No audio tracks found in the stream");
+      }
+      
+      console.log(`Adding ${audioTracks.length} audio tracks to peer connection`);
+      
+      // Add each audio track to the peer connection
+      for (const track of audioTracks) {
+        // Make sure track is enabled
+        if (!track.enabled) {
+          track.enabled = true;
+          console.log(`Enabled track: ${track.label}`);
+        }
+        
+        this.audioSender = this.peerConnection.addTrack(track, stream);
+        console.log(`Added track: ${track.kind} (${track.label})`);
+      }
+      
+    } catch (error) {
+      console.error("Error adding tracks to peer connection:", error);
+      throw error;
+    }
   }
 
-  async setupConnection(ephemeralKey: string, model: string): Promise<void> {
+  /**
+   * Create the peer connection with appropriate configuration
+   */
+  private createPeerConnection(): void {
     try {
-      // Create RTCPeerConnection for WebRTC with robust configuration
-      this.pc = new RTCPeerConnection({
+      // Create peer connection with ICE servers
+      this.peerConnection = new RTCPeerConnection({
         iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' }
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" },
         ],
-        iceCandidatePoolSize: 10
+        // Add DSCP to prioritize audio packets
+        sdpSemantics: "unified-plan",
       });
 
-      // Add connection state change monitoring
-      this.pc.onconnectionstatechange = () => {
-        console.log("Connection state changed:", this.pc?.connectionState);
-        if (this.pc?.connectionState === 'connected') {
-          this.connectionActive = true;
-        } else if (['disconnected', 'failed', 'closed'].includes(this.pc?.connectionState || '')) {
-          this.connectionActive = false;
+      // Set up event handlers
+      this.peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          console.log("ICE candidate:", event.candidate);
         }
       };
 
-      this.pc.ontrack = async e => {
-        console.log('Received remote track', e.streams[0]);
-        const stream = e.streams[0];
-        const source = this.audioContext.createMediaStreamSource(stream);
-        source.connect(this.audioContext.destination);
+      this.peerConnection.oniceconnectionstatechange = () => {
+        console.log("ICE connection state:", this.peerConnection?.iceConnectionState);
       };
 
-      this.dc = this.pc.createDataChannel("oai-events");
-      this.dc.addEventListener("message", (e) => {
-        const event = JSON.parse(e.data) as RealtimeEvent;
-        console.log("Received event:", event);
-        this.onMessage(event);
-      });
-
-      const offer = await this.pc.createOffer();
-      await this.pc.setLocalDescription(offer);
-
-      // Log the model being used
-      console.log(`Using model: ${model}`);
+      this.peerConnection.ontrack = (event) => {
+        console.log("Received track:", event.track.kind);
+      };
       
-      const baseUrl = "https://api.openai.com/v1/realtime";
-      const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
-        method: "POST",
-        body: offer.sdp,
-        headers: {
-          Authorization: `Bearer ${ephemeralKey}`,
-          "Content-Type": "application/sdp"
-        },
-      });
+      console.log("Peer connection created successfully");
+    } catch (error) {
+      console.error("Error creating peer connection:", error);
+      throw error;
+    }
+  }
 
-      if (!sdpResponse.ok) {
-        const errorText = await sdpResponse.text();
-        console.error("SDP response error:", errorText);
-        throw new Error(`Failed to establish connection: ${errorText}`);
+  /**
+   * Set up the WebRTC connection with OpenAI
+   * This must be called AFTER addTracks
+   */
+  async setupConnection(token: string, model: string): Promise<void> {
+    try {
+      // Make sure we have tracks added first
+      if (!this.peerConnection) {
+        this.createPeerConnection();
+        console.warn("No peer connection found, created a new one");
+      }
+      
+      // Check for audio tracks before proceeding
+      if (!this.audioSender) {
+        throw new Error("No audio tracks have been added. Call addTracks() first.");
       }
 
-      const answer = {
-        type: "answer" as RTCSdpType,
-        sdp: await sdpResponse.text(),
-      };
+      console.log(`Using model: ${model}`);
+
+      // Create data channel for text
+      this.dataChannel = this.peerConnection.createDataChannel("text");
+      this.setupDataChannel();
+
+      // Create offer with audio
+      const offer = await this.peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: false
+      });
       
-      await this.pc.setRemoteDescription(answer);
-      console.log("WebRTC connection established");
+      // Log SDP for debugging
+      console.log("Created offer SDP:", offer.sdp?.substring(0, 100) + "...");
       
+      // Check if offer includes audio section
+      if (!offer.sdp?.includes("m=audio")) {
+        throw new Error("Generated offer does not contain audio media section");
+      }
+
+      // Set local description first
+      await this.peerConnection.setLocalDescription(offer);
+      
+      // Send offer to OpenAI
+      const response = await fetch("https://api.openai.com/v1/audio/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          model,
+          response_format: { type: "webrtc" },
+          webrtc: { offer: offer.sdp },
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error("SDP response error:", JSON.stringify(error));
+        throw new Error(`Failed to establish connection: ${JSON.stringify(error)}`);
+      }
+
+      const data = await response.json();
+
+      // Set remote description from OpenAI
+      await this.peerConnection.setRemoteDescription({
+        type: "answer",
+        sdp: data.webrtc.answer,
+      });
+
+      console.log("WebRTC connection established successfully");
+      this.isConnectionEstablished = true;
     } catch (error) {
       console.error("Error setting up WebRTC connection:", error);
       throw error;
     }
   }
 
-  addTracks(stream: MediaStream): void {
-    if (!this.pc) {
-      throw new Error("PeerConnection not initialized");
-    }
-    
-    stream.getTracks().forEach(track => {
-      console.log(`Adding track to peer connection: ${track.kind} (${track.label})`);
-      this.pc?.addTrack(track, stream);
-    });
+  private setupDataChannel(): void {
+    if (!this.dataChannel) return;
+
+    this.dataChannel.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      this.onMessage(message);
+    };
+
+    this.dataChannel.onopen = () => {
+      console.log("Data channel opened");
+    };
+
+    this.dataChannel.onclose = () => {
+      console.log("Data channel closed");
+    };
   }
 
   sendAudioBuffer(audioData: Float32Array, isPaused: boolean): void {
-    if (this.dc?.readyState === 'open' && !isPaused) {
-      this.dc.send(JSON.stringify({
-        type: 'input_audio_buffer.append',
-        audio: encodeAudioData(audioData)
-      }));
+    if (this.isAudioPaused || isPaused) return;
+
+    // Send audio data over the data channel
+    if (this.dataChannel && this.dataChannel.readyState === "open") {
+      this.dataChannel.send(JSON.stringify({ audioData }));
     }
   }
 
   sendMessage(text: string): void {
-    if (!this.dc || this.dc.readyState !== 'open') {
-      throw new Error('Data channel not ready');
+    if (this.dataChannel && this.dataChannel.readyState === "open") {
+      this.dataChannel.send(JSON.stringify({ text }));
     }
-
-    const event = {
-      type: 'conversation.item.create',
-      item: {
-        type: 'message',
-        role: 'user',
-        content: [
-          {
-            type: 'input_text',
-            text
-          }
-        ]
-      }
-    };
-
-    this.dc.send(JSON.stringify(event));
-    this.dc.send(JSON.stringify({type: 'response.create'}));
-  }
-
-  isConnected(): boolean {
-    return this.connectionActive && this.dc?.readyState === 'open';
   }
 
   pauseAudio(): void {
-    if (this.audioContext.state === 'running') {
-      this.audioContext.suspend();
-    }
+    this.isAudioPaused = true;
   }
 
   resumeAudio(): void {
-    if (this.audioContext.state === 'suspended') {
-      this.audioContext.resume();
-    }
+    this.isAudioPaused = false;
+  }
+
+  isConnected(): boolean {
+    return this.isConnectionEstablished;
   }
 
   close(): void {
-    this.connectionActive = false;
-    
-    if (this.dc) {
-      this.dc.close();
-      this.dc = null;
-    }
-    
-    if (this.pc) {
-      this.pc.close();
-      this.pc = null;
-    }
-    
-    if (this.audioContext && this.audioContext.state !== 'closed') {
-      this.audioContext.close();
-    }
+    this.peerConnection?.close();
+    this.peerConnection = null;
+    this.dataChannel = null;
+    this.audioSender = null;
+    this.isConnectionEstablished = false;
+    console.log("WebRTC connection closed");
   }
 }

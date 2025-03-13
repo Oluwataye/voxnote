@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { RealtimeChat } from "@/utils/audio";
@@ -80,7 +79,10 @@ export const useTranscription = () => {
       
       // Initialize the real-time chat
       const newChat = new RealtimeChat(handleMessage);
+      
+      // Initialize will throw an error if something goes wrong
       await newChat.init();
+      
       setChat(newChat);
       setIsRecording(true);
       setTranscript('');
@@ -127,13 +129,11 @@ export const useTranscription = () => {
     setTranscript('');
   };
 
-  // Add the new clearTranscript function that doesn't stop recording
   const clearTranscript = () => {
     setTranscript('');
     toast.success("Transcription cleared");
   };
 
-  // Cleanup for WebRTC connections
   const cleanup = () => {
     if (chat) {
       chat.disconnect();
