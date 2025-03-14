@@ -1,3 +1,4 @@
+
 import { RealtimeEvent } from "./types";
 
 export class WebRTCManager {
@@ -67,8 +68,7 @@ export class WebRTCManager {
           { urls: "stun:stun.l.google.com:19302" },
           { urls: "stun:stun1.l.google.com:19302" },
         ],
-        // Add DSCP to prioritize audio packets
-        sdpSemantics: "unified-plan",
+        // Remove the sdpSemantics property as it's not in the RTCConfiguration type
       });
 
       // Set up event handlers
