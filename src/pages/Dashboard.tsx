@@ -1,7 +1,7 @@
 
 import { useEffect } from "react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { TranscriptionArea } from "@/components/dashboard/TranscriptionArea";
+import { TranscriptionArea } from "@/components/dashboard/transcription";
 import { RecentConsultations } from "@/components/dashboard/RecentConsultations";
 import { useConsultationData } from "@/hooks/consultation";
 import { ErrorBoundary } from "@/components/ui/error-boundary";

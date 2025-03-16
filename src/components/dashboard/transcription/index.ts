@@ -1,0 +1,2 @@
+
+export { TranscriptionArea } from './TranscriptionArea';
