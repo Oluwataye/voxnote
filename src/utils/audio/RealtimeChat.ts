@@ -12,6 +12,7 @@ export class RealtimeChat {
   private apiClient: OpenAIClient;
   private recorder: AudioRecorder | null = null;
   private isPaused: boolean = false;
+  private isInitializing: boolean = false;
 
   constructor(private onMessage: (message: RealtimeEvent) => void) {
     this.webRTC = new WebRTCManagerFacade(this.onMessage, this.SAMPLE_RATE);
@@ -20,13 +21,25 @@ export class RealtimeChat {
   }
 
   async init() {
+    if (this.isInitializing) {
+      console.log("Already initializing chat session, please wait...");
+      return;
+    }
+    
+    this.isInitializing = true;
+    let microphoneStream: MediaStream | null = null;
+    
     try {
       // Get ephemeral token for OpenAI
       const { token, model } = await this.apiClient.getEphemeralToken();
       console.log("Got token and model:", model);
+      
+      if (!token) {
+        throw new Error("Failed to obtain API token. Please check your network connection and try again.");
+      }
 
       // Request microphone permission first to ensure we have access before setting up WebRTC
-      const microphoneStream = await this.micManager.requestMicrophonePermission({
+      microphoneStream = await this.micManager.requestMicrophonePermission({
         audio: {
           sampleRate: this.SAMPLE_RATE,
           channelCount: 1,
@@ -60,9 +73,29 @@ export class RealtimeChat {
       console.log("Audio recorder started successfully");
 
     } catch (error) {
+      // Clean up resources on error
+      if (microphoneStream) {
+        this.micManager.cleanup();
+      }
+      
+      if (this.recorder) {
+        this.recorder.stop();
+        this.recorder = null;
+      }
+      
       console.error("Error initializing chat:", error);
-      this.cleanup();
+      
+      // Translate technical errors into user-friendly messages
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        throw new Error("Network connection error. Please check your internet connection and try again.");
+      } else if (error instanceof Error && error.message.includes("API key")) {
+        throw new Error("Authentication error. Please sign out and sign in again.");
+      }
+      
+      // Rethrow original error or enhanced message
       throw error;
+    } finally {
+      this.isInitializing = false;
     }
   }
 
@@ -75,7 +108,12 @@ export class RealtimeChat {
   }
 
   async sendMessage(text: string) {
-    this.webRTC.sendMessage(text);
+    try {
+      this.webRTC.sendMessage(text);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      throw new Error("Failed to send message. The connection may have been lost.");
+    }
   }
 
   pause() {

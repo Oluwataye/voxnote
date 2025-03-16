@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Eraser } from "lucide-react";
+import { Mic, MicOff, Eraser, Loader2 } from "lucide-react";
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -27,7 +27,7 @@ export const TranscriptionControls = ({
       try {
         await onToggleRecording();
       } finally {
-        setIsAccessingMic(false);
+        setTimeout(() => setIsAccessingMic(false), 500); // Add slight delay to prevent rapid clicking
       }
     } else {
       onToggleRecording();
@@ -69,7 +69,11 @@ export const TranscriptionControls = ({
             "relative",
             isAccessingMic && "animate-spin"
           )}>
-            <Mic className="w-5 h-5" />
+            {isAccessingMic ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Mic className="w-5 h-5" />
+            )}
           </div>
         )}
       </Button>

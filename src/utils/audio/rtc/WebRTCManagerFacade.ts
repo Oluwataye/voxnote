@@ -9,6 +9,8 @@ export class WebRTCManagerFacade {
   private dataChannelManager: DataChannelManager;
   private mediaManager: MediaManager;
   private isConnectionEstablished: boolean = false;
+  private retryCount: number = 0;
+  private maxRetries: number = 2;
 
   constructor(private onMessage: (message: RealtimeEvent) => void, private sampleRate: number = 24000) {
     this.dataChannelManager = new DataChannelManager(this.onMessage);
@@ -42,6 +44,9 @@ export class WebRTCManagerFacade {
 
   async setupConnection(token: string, model: string): Promise<void> {
     try {
+      // Reset retry count on new setup attempt
+      this.retryCount = 0;
+      
       // Make sure we have a peer connection
       const peerConnection = this.connectionManager.getPeerConnection() || 
                              this.connectionManager.createPeerConnection();
@@ -56,6 +61,18 @@ export class WebRTCManagerFacade {
       // Create data channel for text
       this.dataChannelManager.createDataChannel(peerConnection);
 
+      await this.attemptConnection(token, model);
+      
+      console.log("WebRTC connection established successfully");
+      this.isConnectionEstablished = true;
+    } catch (error) {
+      console.error("Error setting up WebRTC connection:", error);
+      throw error;
+    }
+  }
+
+  private async attemptConnection(token: string, model: string, isRetry: boolean = false): Promise<void> {
+    try {
       // Create offer with audio
       const offer = await this.connectionManager.createOffer();
       
@@ -77,9 +94,18 @@ export class WebRTCManagerFacade {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ error: { message: response.statusText } }));
         console.error("SDP response error:", JSON.stringify(error));
-        throw new Error(`Failed to establish connection: ${JSON.stringify(error)}`);
+        
+        // If we get a specific token error, we should not retry
+        if (error.error?.code === "invalid_api_key" || 
+            error.error?.message?.includes("key") || 
+            error.error?.message?.includes("token") ||
+            response.status === 401) {
+          throw new Error(`Authentication error: Invalid or expired API key. Please try again.`);
+        }
+        
+        throw new Error(`API error: ${error.error?.message || 'Failed to connect to OpenAI'}`);
       }
 
       const data = await response.json();
@@ -89,11 +115,21 @@ export class WebRTCManagerFacade {
         type: "answer",
         sdp: data.webrtc.answer,
       });
-
-      console.log("WebRTC connection established successfully");
-      this.isConnectionEstablished = true;
     } catch (error) {
-      console.error("Error setting up WebRTC connection:", error);
+      if (isRetry || this.retryCount >= this.maxRetries) {
+        throw error;
+      }
+      
+      // Handle network errors with retry
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        console.log(`Connection attempt failed, retrying (${this.retryCount + 1}/${this.maxRetries})...`);
+        this.retryCount++;
+        
+        // Wait a moment before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return this.attemptConnection(token, model, true);
+      }
+      
       throw error;
     }
   }

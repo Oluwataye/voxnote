@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { RealtimeChat } from "@/utils/audio";
@@ -7,6 +8,7 @@ export const useTranscription = () => {
   const [transcript, setTranscript] = useState("");
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [chat, setChat] = useState<RealtimeChat | null>(null);
+  const [isInitializing, setIsInitializing] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const micPermissionChecked = useRef(false);
 
@@ -26,7 +28,7 @@ export const useTranscription = () => {
         setIsSpeaking(false);
       } else if (event.type === 'error') {
         console.error('Transcription error:', event);
-        toast.error("Error in transcription");
+        toast.error("Error in transcription: " + (event.error?.message || "Unknown error"));
       }
     } catch (error) {
       console.error('Error handling transcription message:', error);
@@ -72,7 +74,14 @@ export const useTranscription = () => {
   };
 
   const startRecording = async () => {
+    if (isInitializing) {
+      toast.info("Initializing, please wait...");
+      return false;
+    }
+    
     try {
+      setIsInitializing(true);
+      
       // Check for microphone permissions first
       const hasPermission = await checkMicrophonePermission();
       if (!hasPermission) return false;
@@ -80,28 +89,48 @@ export const useTranscription = () => {
       // Initialize the real-time chat
       const newChat = new RealtimeChat(handleMessage);
       
-      // Initialize will throw an error if something goes wrong
-      await newChat.init();
+      toast.loading("Connecting to AI service...");
       
-      setChat(newChat);
-      setIsRecording(true);
-      setTranscript('');
-      
-      console.log('Recording started successfully');
-      toast.success("Recording started");
-      return true;
+      try {
+        // Initialize will throw an error if something goes wrong
+        await newChat.init();
+        
+        setChat(newChat);
+        setIsRecording(true);
+        setTranscript('');
+        
+        console.log('Recording started successfully');
+        toast.success("Recording started");
+        return true;
+      } catch (error) {
+        let errorMessage = "Failed to start recording. Please try again.";
+        
+        if (error instanceof Error) {
+          // Network related errors
+          if (error.message.includes("Network connection")) {
+            errorMessage = "Network connection error. Please check your internet connection and try again.";
+          } 
+          // Authentication errors
+          else if (error.message.includes("Authentication") || error.message.includes("API key")) {
+            errorMessage = "Authentication error. Please try signing out and signing back in.";
+          }
+          // Microphone errors
+          else if (error.message.includes("microphone")) {
+            errorMessage = error.message;
+          }
+        }
+        
+        console.error('Error starting recording:', error);
+        toast.error(errorMessage);
+        return false;
+      }
     } catch (error) {
       console.error('Error starting recording:', error);
-      if (error instanceof DOMException && error.name === 'NotAllowedError') {
-        toast.error("Microphone access denied. Please enable microphone access in your browser settings.");
-      } else if (error instanceof DOMException && error.name === 'NotReadableError') {
-        toast.error("Unable to access your microphone. Please check your device connections.");
-      } else if (error instanceof DOMException && error.name === 'NotFoundError') {
-        toast.error("No microphone detected. Please connect a microphone to your device.");
-      } else {
-        toast.error("Failed to start recording. Please try again.");
-      }
+      toast.error("Failed to start recording. Please try again.");
       return false;
+    } finally {
+      setIsInitializing(false);
+      toast.dismiss();
     }
   };
 
