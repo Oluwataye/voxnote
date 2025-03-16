@@ -2,19 +2,19 @@
 import { AudioRecorder } from "./AudioRecorder";
 import { MicrophoneManager } from "./MicrophoneManager";
 import { OpenAIClient } from "./OpenAIClient";
-import { WebRTCManager } from "./WebRTCManager";
+import { WebRTCManagerFacade } from "./rtc";
 import { RealtimeEvent } from "./types";
 
 export class RealtimeChat {
   private readonly SAMPLE_RATE = 24000;
-  private webRTC: WebRTCManager;
+  private webRTC: WebRTCManagerFacade;
   private micManager: MicrophoneManager;
   private apiClient: OpenAIClient;
   private recorder: AudioRecorder | null = null;
   private isPaused: boolean = false;
 
   constructor(private onMessage: (message: RealtimeEvent) => void) {
-    this.webRTC = new WebRTCManager(this.onMessage, this.SAMPLE_RATE);
+    this.webRTC = new WebRTCManagerFacade(this.onMessage, this.SAMPLE_RATE);
     this.micManager = new MicrophoneManager();
     this.apiClient = new OpenAIClient();
   }

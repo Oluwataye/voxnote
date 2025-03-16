@@ -61,6 +61,9 @@ export type RealtimeEvent =
   | ResponseCreatedEvent
   | ResponseDoneEvent;
 
+// RTC Types
+export type RTCConnectionState = 'new' | 'checking' | 'connected' | 'completed' | 'failed' | 'disconnected' | 'closed';
+
 // Session Configuration Types
 export interface TurnDetectionConfig {
   type: 'server_vad';
