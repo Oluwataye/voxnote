@@ -1,10 +1,12 @@
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { RefObject, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { RecordingStatus } from './RecordingStatus';
 import { TranscriptDisplay } from './TranscriptDisplay';
 import { TranscriptionControls } from './TranscriptionControls';
+import { Button } from '@/components/ui/button';
+import { Save } from 'lucide-react';
 
 interface TranscriptionAreaProps {
   isRecording: boolean;
@@ -65,13 +67,15 @@ export const TranscriptionArea = ({
               </span>
             )}
           </div>
-          <TranscriptionControls
-            isRecording={isRecording}
-            transcript={transcript}
-            onToggleRecording={onToggleRecording}
-            onSave={onSave}
-            onClear={onClear}
-          />
+          <div>
+            <TranscriptionControls
+              isRecording={isRecording}
+              transcript={transcript}
+              onToggleRecording={onToggleRecording}
+              onSave={null}
+              onClear={onClear}
+            />
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -83,6 +87,20 @@ export const TranscriptionArea = ({
           isSpeaking={isSpeaking}
         />
       </CardContent>
+      <CardFooter className="justify-end pt-2">
+        <Button
+          onClick={onSave}
+          disabled={!transcript || isRecording}
+          className={cn(
+            "bg-gradient-to-r from-[#9b87f5] to-[#7E69AB] hover:from-[#8674d4] hover:to-[#6a5992] text-white transition-all duration-300 gap-2 shadow-md",
+            "disabled:opacity-50 disabled:pointer-events-none",
+            !transcript || isRecording ? "" : "animate-[pulse_2s_infinite]"
+          )}
+        >
+          <Save className="w-4 h-4" />
+          Save Consultation
+        </Button>
+      </CardFooter>
     </Card>
   );
 };
