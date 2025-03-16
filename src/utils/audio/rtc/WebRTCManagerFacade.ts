@@ -100,7 +100,7 @@ export class WebRTCManagerFacade {
 
   sendAudioBuffer(audioData: Float32Array, isPaused: boolean): void {
     // Use isPaused from both the local state and the parameter
-    if (this.mediaManager.isAudioPaused() || isPaused) return;
+    if (this.mediaManager.getAudioPauseState() || isPaused) return;
 
     this.dataChannelManager.sendAudioBuffer(audioData, false);
   }

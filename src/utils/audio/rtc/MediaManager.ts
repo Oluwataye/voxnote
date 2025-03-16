@@ -2,7 +2,7 @@
 export class MediaManager {
   private audioSender: RTCRtpSender | null = null;
   private mediaStream: MediaStream | null = null;
-  private isAudioPaused: boolean = false;
+  private audioIsPaused: boolean = false;
 
   constructor() {}
 
@@ -49,15 +49,15 @@ export class MediaManager {
   }
 
   pauseAudio(): void {
-    this.isAudioPaused = true;
+    this.audioIsPaused = true;
   }
 
   resumeAudio(): void {
-    this.isAudioPaused = false;
+    this.audioIsPaused = false;
   }
 
-  isAudioPaused(): boolean {
-    return this.isAudioPaused;
+  getAudioPauseState(): boolean {
+    return this.audioIsPaused;
   }
 
   getMediaStream(): MediaStream | null {
