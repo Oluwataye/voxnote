@@ -1,5 +1,5 @@
 
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RefObject, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { RecordingStatus } from './RecordingStatus';
@@ -83,15 +83,6 @@ export const TranscriptionArea = ({
           isSpeaking={isSpeaking}
         />
       </CardContent>
-      <CardFooter className="justify-end">
-        <TranscriptionControls
-          isRecording={isRecording}
-          transcript={transcript}
-          onToggleRecording={onToggleRecording}
-          onSave={onSave}
-          onClear={onClear}
-        />
-      </CardFooter>
     </Card>
   );
 };
