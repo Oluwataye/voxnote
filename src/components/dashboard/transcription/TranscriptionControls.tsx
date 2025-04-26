@@ -27,7 +27,8 @@ export const TranscriptionControls = ({
       try {
         await onToggleRecording();
       } finally {
-        setTimeout(() => setIsAccessingMic(false), 500); // Add slight delay to prevent rapid clicking
+        // Add a slight delay to prevent rapid clicking and show feedback
+        setTimeout(() => setIsAccessingMic(false), 800);
       }
     } else {
       onToggleRecording();
@@ -53,7 +54,7 @@ export const TranscriptionControls = ({
         variant={isRecording ? "destructive" : "default"}
         size="icon"
         className={`rounded-full transition-all duration-300 shadow-md ${
-          isAccessingMic ? 'opacity-70 pointer-events-none' : ''
+          isAccessingMic ? 'opacity-70' : ''
         } ${
           isRecording 
             ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' 
@@ -65,10 +66,7 @@ export const TranscriptionControls = ({
         {isRecording ? (
           <MicOff className="w-5 h-5" />
         ) : (
-          <div className={cn(
-            "relative",
-            isAccessingMic && "animate-spin"
-          )}>
+          <div className={cn("relative")}>
             {isAccessingMic ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (

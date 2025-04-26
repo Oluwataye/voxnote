@@ -1,5 +1,5 @@
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { RealtimeChat } from "@/utils/audio";
 
@@ -11,6 +11,8 @@ export const useTranscription = () => {
   const [isInitializing, setIsInitializing] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const micPermissionChecked = useRef(false);
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = 2;
 
   const handleMessage = useCallback((event: any) => {
     try {
@@ -35,6 +37,29 @@ export const useTranscription = () => {
     }
   }, []);
 
+  // Function to detect audio devices
+  const detectAudioDevices = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioDevices = devices.filter(device => device.kind === 'audioinput');
+      
+      console.log(`Found ${audioDevices.length} audio input devices:`);
+      audioDevices.forEach((device, index) => {
+        console.log(`Device ${index + 1}: ${device.label || 'Unknown Device'} (${device.deviceId.substring(0, 8)}...)`);
+      });
+      
+      return audioDevices;
+    } catch (error) {
+      console.error('Error detecting audio devices:', error);
+      return [];
+    }
+  }, []);
+
+  // Run device detection on component mount
+  useEffect(() => {
+    detectAudioDevices();
+  }, [detectAudioDevices]);
+
   const checkMicrophonePermission = async () => {
     try {
       // Request microphone with high-quality settings for better transcription
@@ -54,6 +79,9 @@ export const useTranscription = () => {
         throw new Error('Could not enable audio track');
       }
       
+      console.log(`Connected to microphone: ${audioTrack.label}`);
+      console.log(`Microphone settings:`, audioTrack.getSettings());
+      
       // Only stop tracks after successfully confirming mic access
       stream.getTracks().forEach(track => track.stop());
       micPermissionChecked.current = true;
@@ -66,6 +94,21 @@ export const useTranscription = () => {
         toast.error("Unable to access your microphone. Please check your device connections or try using another microphone.");
       } else if (error instanceof DOMException && error.name === 'NotFoundError') {
         toast.error("No microphone detected. Please connect a microphone to your device.");
+      } else if (error instanceof DOMException && error.name === 'OverconstrainedError') {
+        // If constraints are too strict, try again with default constraints
+        console.log("Default constraints failed, trying with basic constraints");
+        try {
+          const basicStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const audioTrack = basicStream.getAudioTracks()[0];
+          console.log(`Connected to microphone with basic constraints: ${audioTrack.label}`);
+          basicStream.getTracks().forEach(track => track.stop());
+          micPermissionChecked.current = true;
+          return true;
+        } catch (basicError) {
+          console.error('Basic microphone access failed:', basicError);
+          toast.error("Failed to access microphone. Please try again with a different microphone.");
+          return false;
+        }
       } else {
         toast.error("Failed to access microphone. Please try again or check your device settings.");
       }
@@ -86,6 +129,10 @@ export const useTranscription = () => {
       const hasPermission = await checkMicrophonePermission();
       if (!hasPermission) return false;
       
+      // Check available audio devices
+      const audioDevices = await detectAudioDevices();
+      console.log(`Starting recording with ${audioDevices.length} available audio devices`);
+      
       // Initialize the real-time chat
       const newChat = new RealtimeChat(handleMessage);
       
@@ -98,6 +145,7 @@ export const useTranscription = () => {
         setChat(newChat);
         setIsRecording(true);
         setTranscript('');
+        reconnectAttempts.current = 0;
         
         console.log('Recording started successfully');
         toast.success("Recording started");
@@ -106,9 +154,22 @@ export const useTranscription = () => {
         let errorMessage = "Failed to start recording. Please try again.";
         
         if (error instanceof Error) {
+          console.error('Detailed error:', error);
+          
           // Network related errors
-          if (error.message.includes("Network connection")) {
+          if (error.message.includes("Network connection") || error.message.includes("fetch")) {
             errorMessage = "Network connection error. Please check your internet connection and try again.";
+            
+            // Try to reconnect if within the allowed attempts
+            if (reconnectAttempts.current < maxReconnectAttempts) {
+              reconnectAttempts.current++;
+              const delay = reconnectAttempts.current * 1000;
+              toast.info(`Connection issue detected. Retrying in ${delay/1000} seconds...`);
+              
+              await new Promise(resolve => setTimeout(resolve, delay));
+              setIsInitializing(false);
+              return startRecording();
+            }
           } 
           // Authentication errors
           else if (error.message.includes("Authentication") || error.message.includes("API key")) {
@@ -117,6 +178,10 @@ export const useTranscription = () => {
           // Microphone errors
           else if (error.message.includes("microphone")) {
             errorMessage = error.message;
+          }
+          // Connection timeout
+          else if (error.message.includes("timeout") || error.message.includes("timed out")) {
+            errorMessage = "Connection timed out. Please check your internet connection and try again.";
           }
         }
         
@@ -175,6 +240,7 @@ export const useTranscription = () => {
     isSpeaking,
     transcript,
     transcriptRef,
+    isInitializing,
     toggleRecording,
     resetTranscript,
     clearTranscript,
