@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { RealtimeChat } from '@/utils/audio';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { Mic } from 'lucide-react';
+import { Mic, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { useConsultation } from '@/hooks/useConsultation';
 import ConsultationControls from './ConsultationControls';
@@ -72,6 +72,25 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
     endConsultation(chatRef);
   };
 
+  const generatePDF = async () => {
+    if (!consultationId) return;
+
+    try {
+      toast.loading('Generating PDF...', { id: 'pdf-generation' });
+
+      const { data, error } = await supabase.functions.invoke('generate-document', {
+        body: { consultationId, type: 'pdf' }
+      });
+
+      if (error) throw error;
+
+      toast.success('PDF generated successfully!', { id: 'pdf-generation' });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Failed to generate PDF', { id: 'pdf-generation' });
+    }
+  };
+
   const downloadDocument = async () => {
     if (!consultationId) return;
 
@@ -114,6 +133,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ onSpeakingChange }) => 
       onResume={handleResumeConsultation}
       onEnd={handleEndConsultation}
       onDownload={downloadDocument}
+      onGeneratePDF={generatePDF}
       consultationId={consultationId}
     />
   );

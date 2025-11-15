@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, StopCircle, Download } from 'lucide-react';
+import { Play, Pause, StopCircle, Download, FileText } from 'lucide-react';
 
 interface ConsultationControlsProps {
   isPaused: boolean;
@@ -9,6 +9,7 @@ interface ConsultationControlsProps {
   onResume: () => void;
   onEnd: () => void;
   onDownload: () => void;
+  onGeneratePDF: () => void;
   consultationId: string | null;
 }
 
@@ -18,6 +19,7 @@ const ConsultationControls: React.FC<ConsultationControlsProps> = ({
   onResume,
   onEnd,
   onDownload,
+  onGeneratePDF,
   consultationId
 }) => {
   return (
@@ -50,14 +52,25 @@ const ConsultationControls: React.FC<ConsultationControlsProps> = ({
       </Button>
 
       {consultationId && (
-        <Button
-          onClick={onDownload}
-          variant="outline"
-          className="border-white/5 text-white hover:bg-[#2A3041]"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Download
-        </Button>
+        <>
+          <Button
+            onClick={onGeneratePDF}
+            variant="outline"
+            className="border-white/5 text-white hover:bg-[#2A3041]"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Generate PDF
+          </Button>
+          
+          <Button
+            onClick={onDownload}
+            variant="outline"
+            className="border-white/5 text-white hover:bg-[#2A3041]"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Download
+          </Button>
+        </>
       )}
     </div>
   );
