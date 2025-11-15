@@ -89,16 +89,28 @@ const Auth = () => {
                 ? "Create Account"
                 : "Sign In"}
             </Button>
-            <Button
-              type="button"
-              variant="link"
-              className="w-full"
-              onClick={() => setIsSignUp(!isSignUp)}
-            >
-              {isSignUp
-                ? "Already have an account? Sign in"
-                : "Don't have an account? Sign up"}
-            </Button>
+            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="link"
+                className="w-full"
+                onClick={() => setIsSignUp(!isSignUp)}
+              >
+                {isSignUp
+                  ? "Already have an account? Sign in"
+                  : "Don't have an account? Sign up"}
+              </Button>
+              {!isSignUp && (
+                <Button
+                  type="button"
+                  variant="link"
+                  className="w-full text-muted-foreground"
+                  onClick={() => navigate("/reset-password")}
+                >
+                  Forgot password?
+                </Button>
+              )}
+            </div>
           </form>
         </CardContent>
       </Card>
