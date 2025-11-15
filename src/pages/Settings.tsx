@@ -15,11 +15,13 @@ import { Settings as SettingsIcon, FileType, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface UserSettings {
-  auto_save: boolean;
-  language: string;
-  voice_id: string;
-  default_doc_format: string;
-  auto_transcribe: boolean;
+  auto_save?: boolean;
+  language?: string;
+  voice_id?: string;
+  default_doc_format?: string;
+  auto_transcribe?: boolean;
+  notifications_enabled?: boolean;
+  theme?: string;
 }
 
 const Settings = () => {
