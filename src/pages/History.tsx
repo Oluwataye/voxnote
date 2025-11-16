@@ -1,4 +1,21 @@
 import { useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +31,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { useConsultationHistory } from "@/hooks/consultation/useConsultationHistory";
-import { Clock, Download, FileText, Loader2, Search, Filter } from "lucide-react";
+import { Clock, Download, FileText, Loader2, Search, Filter, Trash2, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -25,6 +42,10 @@ const History = () => {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [consultationToDelete, setConsultationToDelete] = useState<string | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [selectedConsultation, setSelectedConsultation] = useState<any | null>(null);
   const pageSize = 10;
 
   const { consultations, totalCount, totalPages, isLoading, refetch } = useConsultationHistory(
@@ -112,6 +133,40 @@ const History = () => {
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleDeleteClick = (consultationId: string) => {
+    setConsultationToDelete(consultationId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!consultationToDelete) return;
+
+    try {
+      toast.loading("Deleting consultation...", { id: "delete-consultation" });
+
+      const { error } = await supabase
+        .from("consultations")
+        .delete()
+        .eq("id", consultationToDelete);
+
+      if (error) throw error;
+
+      toast.success("Consultation deleted successfully", { id: "delete-consultation" });
+      await refetch();
+    } catch (error) {
+      console.error("Error deleting consultation:", error);
+      toast.error("Failed to delete consultation", { id: "delete-consultation" });
+    } finally {
+      setDeleteDialogOpen(false);
+      setConsultationToDelete(null);
+    }
+  };
+
+  const handleViewDetails = (consultation: any) => {
+    setSelectedConsultation(consultation);
+    setDetailModalOpen(true);
   };
 
   return (
@@ -253,7 +308,8 @@ const History = () => {
               return (
                 <Card
                   key={consultation.id}
-                  className="bg-card border-border hover:border-primary/30 transition-all"
+                  className="bg-card border-border hover:border-primary/30 transition-all cursor-pointer"
+                  onClick={() => handleViewDetails(consultation)}
                 >
                   <CardHeader>
                     <div className="flex items-start justify-between">
@@ -284,7 +340,16 @@ const History = () => {
                           )}
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewDetails(consultation)}
+                          className="border-border"
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          View
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -303,6 +368,15 @@ const History = () => {
                         >
                           <Download className="w-4 h-4 mr-2" />
                           Download
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteClick(consultation.id)}
+                          className="border-destructive/50 text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
                         </Button>
                       </div>
                     </div>
@@ -374,6 +448,125 @@ const History = () => {
             )}
           </div>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent className="bg-card border-border">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-foreground">Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription className="text-muted-foreground">
+                This action cannot be undone. This will permanently delete the consultation
+                and all associated data including documents and transcripts.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-border">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Consultation Detail Modal */}
+        <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
+          <DialogContent className="bg-card border-border max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-foreground flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Consultation Details
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                {selectedConsultation && format(new Date(selectedConsultation.created_at), "MMMM d, yyyy 'at' h:mm a")}
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedConsultation && (
+              <div className="space-y-6 pt-4">
+                {/* Metadata Section */}
+                <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg border border-border">
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Status</h4>
+                    <Badge
+                      variant="outline"
+                      className={getStatusColor(selectedConsultation.status)}
+                    >
+                      {getStatusLabel(selectedConsultation.status)}
+                    </Badge>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Created</h4>
+                    <p className="text-sm text-foreground">
+                      {format(new Date(selectedConsultation.created_at), "PPP")}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Language</h4>
+                    <p className="text-sm text-foreground">
+                      {selectedConsultation.original_language?.toUpperCase() || "EN"}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Document</h4>
+                    {selectedConsultation.document_url ? (
+                      <div className="flex items-center gap-1 text-green-400 text-sm">
+                        <FileText className="w-4 h-4" />
+                        <span>Available</span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Not generated</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Full Transcript Section */}
+                <div>
+                  <h4 className="text-sm font-medium text-foreground mb-3">Full Transcript</h4>
+                  <div className="bg-muted/50 rounded-lg p-4 border border-border max-h-96 overflow-y-auto">
+                    <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
+                      {selectedConsultation.consultation_contents?.[0]?.content || "No content available"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Actions Section */}
+                <div className="flex gap-3 pt-4 border-t border-border">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleGeneratePDF(selectedConsultation.id)}
+                    className="border-border flex-1"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Generate PDF
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleDownload(selectedConsultation.id)}
+                    disabled={!selectedConsultation.document_url}
+                    className="border-border flex-1 disabled:opacity-50"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      handleDeleteClick(selectedConsultation.id);
+                      setDetailModalOpen(false);
+                    }}
+                    className="border-destructive/50 text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
