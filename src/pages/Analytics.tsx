@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useConsultationAnalytics } from "@/hooks/consultation/useConsultationAnalytics";
 import { exportToCSV, exportToPDF } from "@/utils/exportUtils";
+import { TagCloud } from "@/components/TagCloud";
 import {
   BarChart,
   Bar,
@@ -217,6 +218,7 @@ const Analytics = () => {
             <TabsTrigger value="weekly">Weekly</TabsTrigger>
             <TabsTrigger value="monthly">Monthly</TabsTrigger>
             <TabsTrigger value="status">Status</TabsTrigger>
+            <TabsTrigger value="tags">Tags</TabsTrigger>
           </TabsList>
 
           <TabsContent value="daily" className="space-y-4">
@@ -402,6 +404,125 @@ const Analytics = () => {
                   ))}
                 </CardContent>
               </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="tags" className="space-y-4">
+            <div className="grid gap-4">
+              {/* Tag Cloud */}
+              <Card className="bg-card border-border">
+                <CardHeader>
+                  <CardTitle>Tag Cloud</CardTitle>
+                  <CardDescription>Visual representation of consultation tags by frequency</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <TagCloud tags={analytics?.tagDistribution || []} maxTags={30} />
+                </CardContent>
+              </Card>
+
+              {/* Tag Distribution Chart */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card className="bg-card border-border">
+                  <CardHeader>
+                    <CardTitle>Top 10 Tags</CardTitle>
+                    <CardDescription>Most frequently used tags</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={analytics?.topTags || []}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={(entry) => {
+                            const total = analytics?.totalConsultations || 1;
+                            const percentage = (entry.count / total) * 100;
+                            return `${entry.tag}: ${percentage.toFixed(1)}%`;
+                          }}
+                          outerRadius={80}
+                          fill="hsl(var(--primary))"
+                          dataKey="count"
+                        >
+                          {analytics?.topTags.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "hsl(var(--card))",
+                            border: "1px solid hsl(var(--border))",
+                            borderRadius: "8px",
+                            color: "hsl(var(--foreground))",
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-card border-border">
+                  <CardHeader>
+                    <CardTitle>Tag Statistics</CardTitle>
+                    <CardDescription>Detailed tag breakdown</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4 max-h-[300px] overflow-y-auto">
+                    {analytics?.topTags && analytics.topTags.length > 0 ? (
+                      analytics.topTags.map((item, index) => {
+                        const percentage = analytics.totalConsultations > 0 
+                          ? (item.count / analytics.totalConsultations) * 100 
+                          : 0;
+                        return (
+                          <div key={item.tag} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                              />
+                              <span className="text-sm font-medium text-foreground">
+                                {item.tag}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <span className="text-sm text-muted-foreground">
+                                {item.count} ({percentage.toFixed(1)}%)
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-sm text-muted-foreground text-center py-8">
+                        No tags found. Start adding tags to your consultations!
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* All Tags List */}
+              {analytics?.tagDistribution && analytics.tagDistribution.length > 10 && (
+                <Card className="bg-card border-border">
+                  <CardHeader>
+                    <CardTitle>All Tags ({analytics.tagDistribution.length})</CardTitle>
+                    <CardDescription>Complete list of all tags used</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
+                      {analytics.tagDistribution.map((item) => (
+                        <div key={item.tag} className="flex items-center justify-between p-2 bg-muted/50 rounded border border-border">
+                          <span className="text-sm font-medium text-foreground truncate">
+                            {item.tag}
+                          </span>
+                          <span className="text-xs text-muted-foreground ml-2">
+                            {item.count}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </TabsContent>
         </Tabs>
