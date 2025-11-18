@@ -2,7 +2,12 @@ import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useConsultationAnalytics } from "@/hooks/consultation/useConsultationAnalytics";
+import { exportToCSV, exportToPDF } from "@/utils/exportUtils";
 import {
   BarChart,
   Bar,
@@ -18,13 +23,44 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Activity, TrendingUp, FileText, Clock, Loader2 } from "lucide-react";
+import { Activity, TrendingUp, FileText, Clock, Loader2, Download, FileDown } from "lucide-react";
+import { toast } from "sonner";
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
 
 const Analytics = () => {
   const [timeRange, setTimeRange] = useState<number>(30);
-  const { analytics, isLoading } = useConsultationAnalytics(timeRange);
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const filters = {
+    dateFrom: dateFrom ? new Date(dateFrom) : undefined,
+    dateTo: dateTo ? new Date(dateTo) : undefined,
+    status: statusFilter !== "all" ? statusFilter : undefined,
+  };
+
+  const { analytics, isLoading } = useConsultationAnalytics(timeRange, filters);
+
+  const handleExportCSV = () => {
+    if (analytics) {
+      exportToCSV(analytics);
+      toast.success("Analytics exported as CSV");
+    }
+  };
+
+  const handleExportPDF = () => {
+    if (analytics) {
+      exportToPDF(analytics);
+      toast.success("Analytics exported as PDF");
+    }
+  };
+
+  const handleClearFilters = () => {
+    setDateFrom("");
+    setDateTo("");
+    setStatusFilter("all");
+  };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
@@ -50,10 +86,72 @@ const Analytics = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Analytics Dashboard</h1>
-          <p className="text-muted-foreground">Track your consultation metrics and trends</p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">Analytics Dashboard</h1>
+            <p className="text-muted-foreground">Track your consultation metrics and trends</p>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleExportCSV} variant="outline" className="gap-2">
+              <Download className="w-4 h-4" />
+              Export CSV
+            </Button>
+            <Button onClick={handleExportPDF} variant="outline" className="gap-2">
+              <FileDown className="w-4 h-4" />
+              Export PDF
+            </Button>
+          </div>
         </div>
+
+        {/* Filters */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-lg">Filters</CardTitle>
+            <CardDescription>Customize your analytics view</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="space-y-2">
+                <Label htmlFor="dateFrom">From Date</Label>
+                <Input
+                  id="dateFrom"
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="bg-background border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dateTo">To Date</Label>
+                <Input
+                  id="dateTo"
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="bg-background border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger id="status" className="bg-background border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end">
+                <Button onClick={handleClearFilters} variant="outline" className="w-full">
+                  Clear Filters
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Key Metrics */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
