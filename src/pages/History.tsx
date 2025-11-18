@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TagInput } from "@/components/TagInput";
 import {
   Pagination,
   PaginationContent,
@@ -31,7 +32,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { useConsultationHistory } from "@/hooks/consultation/useConsultationHistory";
-import { Clock, Download, FileText, Loader2, Search, Filter, Trash2, Eye } from "lucide-react";
+import { Clock, Download, FileText, Loader2, Search, Filter, Trash2, Eye, Tag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -46,6 +47,8 @@ const History = () => {
   const [consultationToDelete, setConsultationToDelete] = useState<string | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedConsultation, setSelectedConsultation] = useState<any | null>(null);
+  const [editingTags, setEditingTags] = useState<string | null>(null);
+  const [tempTags, setTempTags] = useState<string[]>([]);
   const pageSize = 10;
 
   const { consultations, totalCount, totalPages, isLoading, refetch } = useConsultationHistory(
@@ -167,6 +170,36 @@ const History = () => {
   const handleViewDetails = (consultation: any) => {
     setSelectedConsultation(consultation);
     setDetailModalOpen(true);
+  };
+
+  const handleEditTags = (consultationId: string, currentTags: string[]) => {
+    setEditingTags(consultationId);
+    setTempTags(currentTags || []);
+  };
+
+  const handleSaveTags = async (consultationId: string) => {
+    try {
+      toast.loading("Updating tags...", { id: "update-tags" });
+
+      const { error } = await supabase
+        .from("consultations")
+        .update({ tags: tempTags })
+        .eq("id", consultationId);
+
+      if (error) throw error;
+
+      toast.success("Tags updated successfully", { id: "update-tags" });
+      await refetch();
+      setEditingTags(null);
+    } catch (error) {
+      console.error("Error updating tags:", error);
+      toast.error("Failed to update tags", { id: "update-tags" });
+    }
+  };
+
+  const handleCancelEditTags = () => {
+    setEditingTags(null);
+    setTempTags([]);
   };
 
   return (
@@ -382,10 +415,62 @@ const History = () => {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                    <div className="bg-muted/50 rounded-lg p-4 border border-border mb-4">
                       <p className="text-sm text-foreground/80 line-clamp-3 leading-relaxed">
                         {content}
                       </p>
+                    </div>
+
+                    {/* Tags Section */}
+                    <div className="border-t border-border pt-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Tag className="w-4 h-4" />
+                          <span>Tags</span>
+                        </div>
+                        {editingTags !== consultation.id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditTags(consultation.id, consultation.tags || []);
+                            }}
+                          >
+                            Edit Tags
+                          </Button>
+                        )}
+                      </div>
+
+                      {editingTags === consultation.id ? (
+                        <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                          <TagInput
+                            tags={tempTags}
+                            onTagsChange={setTempTags}
+                            placeholder="Add tags (e.g., cardiology, pediatrics...)"
+                          />
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => handleSaveTags(consultation.id)}>
+                              Save Tags
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={handleCancelEditTags}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {consultation.tags && consultation.tags.length > 0 ? (
+                            consultation.tags.map((tag: string) => (
+                              <Badge key={tag} variant="secondary">
+                                {tag}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-sm text-muted-foreground">No tags added</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

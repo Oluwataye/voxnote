@@ -58,6 +58,7 @@ export type Database = {
           is_paused: boolean | null
           original_language: string | null
           status: string
+          tags: string[] | null
           updated_at: string | null
           user_id: string
         }
@@ -69,6 +70,7 @@ export type Database = {
           is_paused?: boolean | null
           original_language?: string | null
           status?: string
+          tags?: string[] | null
           updated_at?: string | null
           user_id: string
         }
@@ -80,6 +82,7 @@ export type Database = {
           is_paused?: boolean | null
           original_language?: string | null
           status?: string
+          tags?: string[] | null
           updated_at?: string | null
           user_id?: string
         }

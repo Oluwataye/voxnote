@@ -15,6 +15,7 @@ export interface Consultation {
   status: string;
   consultation_contents?: ConsultationContent[];
   document_url?: string | null;
+  tags?: string[];
 }
 
 interface FilterOptions {

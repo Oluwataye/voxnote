@@ -16,20 +16,45 @@ export interface AnalyticsData {
   statusDistribution: { status: string; count: number; percentage: number }[];
 }
 
-export const useConsultationAnalytics = (days: number = 30) => {
+interface AnalyticsFilters {
+  dateFrom?: Date;
+  dateTo?: Date;
+  status?: string;
+  tags?: string[];
+}
+
+export const useConsultationAnalytics = (
+  days: number = 30,
+  filters?: AnalyticsFilters
+) => {
   const { data: analytics, isLoading } = useQuery({
-    queryKey: ['consultation-analytics', days],
+    queryKey: ['consultation-analytics', days, filters],
     queryFn: async (): Promise<AnalyticsData> => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Not authenticated");
 
-        // Fetch all consultations
-        const { data: consultations, error } = await supabase
+        // Fetch all consultations with filters
+        let query = supabase
           .from('consultations')
-          .select('id, created_at, status')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: true });
+          .select('id, created_at, status, tags')
+          .eq('user_id', user.id);
+
+        // Apply filters
+        if (filters?.dateFrom) {
+          query = query.gte('created_at', filters.dateFrom.toISOString());
+        }
+        if (filters?.dateTo) {
+          query = query.lte('created_at', filters.dateTo.toISOString());
+        }
+        if (filters?.status && filters.status !== 'all') {
+          query = query.eq('status', filters.status);
+        }
+        if (filters?.tags && filters.tags.length > 0) {
+          query = query.overlaps('tags', filters.tags);
+        }
+
+        const { data: consultations, error } = await query.order('created_at', { ascending: true });
 
         if (error) throw error;
 
