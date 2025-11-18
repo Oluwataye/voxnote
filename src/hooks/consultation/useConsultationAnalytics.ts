@@ -14,6 +14,8 @@ export interface AnalyticsData {
   weeklyData: { week: string; count: number }[];
   monthlyData: { month: string; count: number }[];
   statusDistribution: { status: string; count: number; percentage: number }[];
+  tagDistribution: { tag: string; count: number; percentage: number }[];
+  topTags: { tag: string; count: number }[];
 }
 
 interface AnalyticsFilters {
@@ -154,6 +156,27 @@ export const useConsultationAnalytics = (
           percentage: totalConsultations > 0 ? (count / totalConsultations) * 100 : 0,
         }));
 
+        // Tag distribution and analysis
+        const tagMap = new Map<string, number>();
+        consultations?.forEach(c => {
+          if (c.tags && Array.isArray(c.tags)) {
+            c.tags.forEach(tag => {
+              tagMap.set(tag, (tagMap.get(tag) || 0) + 1);
+            });
+          }
+        });
+
+        const tagDistribution = Array.from(tagMap.entries())
+          .map(([tag, count]) => ({
+            tag,
+            count,
+            percentage: totalConsultations > 0 ? (count / totalConsultations) * 100 : 0,
+          }))
+          .sort((a, b) => b.count - a.count);
+
+        // Top 10 tags
+        const topTags = tagDistribution.slice(0, 10);
+
         return {
           totalConsultations,
           completedConsultations,
@@ -165,6 +188,8 @@ export const useConsultationAnalytics = (
           weeklyData,
           monthlyData,
           statusDistribution,
+          tagDistribution,
+          topTags,
         };
       } catch (error) {
         console.error("Failed to fetch analytics:", error);
@@ -180,6 +205,8 @@ export const useConsultationAnalytics = (
           weeklyData: [],
           monthlyData: [],
           statusDistribution: [],
+          tagDistribution: [],
+          topTags: [],
         };
       }
     }
