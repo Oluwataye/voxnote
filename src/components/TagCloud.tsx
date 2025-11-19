@@ -4,9 +4,10 @@ import { Badge } from "@/components/ui/badge";
 interface TagCloudProps {
   tags: { tag: string; count: number }[];
   maxTags?: number;
+  onTagClick?: (tag: string) => void;
 }
 
-export const TagCloud = ({ tags, maxTags = 20 }: TagCloudProps) => {
+export const TagCloud = ({ tags, maxTags = 20, onTagClick }: TagCloudProps) => {
   const displayTags = useMemo(() => {
     const sortedTags = [...tags].sort((a, b) => b.count - a.count).slice(0, maxTags);
     
@@ -35,19 +36,28 @@ export const TagCloud = ({ tags, maxTags = 20 }: TagCloudProps) => {
 
   return (
     <div className="flex flex-wrap gap-3 items-center justify-center p-6 bg-muted/30 rounded-lg border border-border min-h-[300px]">
-      {displayTags.map(({ tag, count, size }) => (
-        <Badge
-          key={tag}
-          variant="secondary"
-          className="transition-all hover:scale-110 cursor-default"
-          style={{
-            fontSize: `${size}px`,
-            padding: `${size / 3}px ${size / 2}px`,
-          }}
-        >
-          {tag} ({count})
-        </Badge>
-      ))}
+      {displayTags.map(({ tag, count, size }) => {
+        const getFontSize = (count: number) => {
+          const minSize = 0.75;
+          const maxSize = 2;
+          return minSize + ((count - (displayTags[displayTags.length - 1]?.count || 0)) / ((displayTags[0]?.count || 1) - (displayTags[displayTags.length - 1]?.count || 0)) || 0) * (maxSize - minSize);
+        };
+        
+        return (
+          <span
+            key={tag}
+            className={`inline-block px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 transition-all hover:bg-primary/20 ${
+              onTagClick ? 'cursor-pointer hover:scale-110' : ''
+            }`}
+            style={{
+              fontSize: `${getFontSize(count)}rem`,
+            }}
+            onClick={() => onTagClick?.(tag)}
+          >
+            {tag}
+          </span>
+        );
+      })}
     </div>
   );
 };

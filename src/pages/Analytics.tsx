@@ -413,10 +413,17 @@ const Analytics = () => {
               <Card className="bg-card border-border">
                 <CardHeader>
                   <CardTitle>Tag Cloud</CardTitle>
-                  <CardDescription>Visual representation of consultation tags by frequency</CardDescription>
+                  <CardDescription>Visual representation of consultation tags by frequency (click to filter)</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <TagCloud tags={analytics?.tagDistribution || []} maxTags={30} />
+                  <TagCloud 
+                    tags={analytics?.tagDistribution || []} 
+                    maxTags={30}
+                    onTagClick={(tag) => {
+                      // Navigate to History page with tag filter
+                      window.location.href = `/history?tag=${encodeURIComponent(tag)}`;
+                    }}
+                  />
                 </CardContent>
               </Card>
 
@@ -491,9 +498,23 @@ const Analytics = () => {
                           </div>
                         );
                       })
-                    ) : (
+                     ) : (
                       <div className="text-sm text-muted-foreground text-center py-8">
                         No tags found. Start adding tags to your consultations!
+                      </div>
+                    )}
+                    {analytics?.topTags && analytics.topTags.length > 0 && (
+                      <div className="pt-4 border-t border-border">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            window.location.href = '/history';
+                          }}
+                          className="w-full"
+                        >
+                          View All Consultations by Tag
+                        </Button>
                       </div>
                     )}
                   </CardContent>
@@ -509,8 +530,14 @@ const Analytics = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
-                      {analytics.tagDistribution.map((item) => (
-                        <div key={item.tag} className="flex items-center justify-between p-2 bg-muted/50 rounded border border-border">
+                       {analytics.tagDistribution.map((item) => (
+                        <div 
+                          key={item.tag} 
+                          className="flex items-center justify-between p-2 bg-muted/50 rounded border border-border hover:border-primary/50 transition-colors cursor-pointer"
+                          onClick={() => {
+                            window.location.href = `/history?tag=${encodeURIComponent(item.tag)}`;
+                          }}
+                        >
                           <span className="text-sm font-medium text-foreground truncate">
                             {item.tag}
                           </span>
