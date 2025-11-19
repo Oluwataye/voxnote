@@ -88,6 +88,42 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_templates: {
+        Row: {
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+          specialty: string
+          tags: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          specialty: string
+          tags?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          specialty?: string
+          tags?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           consultation_id: string
@@ -143,6 +179,41 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      template_question_sets: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          order_index: number
+          questions: string[]
+          template_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          order_index?: number
+          questions?: string[]
+          template_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          order_index?: number
+          questions?: string[]
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_question_sets_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "custom_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_settings: {
         Row: {

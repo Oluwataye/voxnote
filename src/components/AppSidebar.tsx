@@ -11,7 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, LogOut, Settings, History, BarChart3 } from "lucide-react";
+import { LayoutDashboard, LogOut, Settings, History, BarChart3, FileText } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -58,6 +58,11 @@ export function AppSidebar() {
       title: "Analytics",
       url: "/analytics",
       icon: BarChart3,
+    },
+    {
+      title: "Templates",
+      url: "/templates",
+      icon: FileText,
     },
     {
       title: "Settings",
