@@ -23,6 +23,7 @@ interface FilterOptions {
   searchQuery?: string;
   dateFrom?: string;
   dateTo?: string;
+  tags?: string[];
 }
 
 interface PaginationOptions {
@@ -34,11 +35,11 @@ export const useConsultationHistory = (
   filters: FilterOptions = {},
   pagination: PaginationOptions = { page: 1, pageSize: 10 }
 ) => {
-  const { status, searchQuery, dateFrom, dateTo } = filters;
+  const { status, searchQuery, dateFrom, dateTo, tags } = filters;
   const { page, pageSize } = pagination;
 
   const { data, refetch, isLoading } = useQuery({
-    queryKey: ['consultation-history', status, searchQuery, dateFrom, dateTo, page, pageSize],
+    queryKey: ['consultation-history', status, searchQuery, dateFrom, dateTo, tags, page, pageSize],
     queryFn: async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -74,6 +75,11 @@ export const useConsultationHistory = (
         // Apply search query filter (search in content)
         if (searchQuery) {
           query = query.or(`consultation_contents.content.ilike.%${searchQuery}%`);
+        }
+
+        // Apply tag filter
+        if (tags && tags.length > 0) {
+          query = query.contains('tags', tags);
         }
 
         // Apply pagination

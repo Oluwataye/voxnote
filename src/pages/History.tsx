@@ -38,10 +38,15 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 
 const History = () => {
+  // Get tag filter from URL params
+  const searchParams = new URLSearchParams(window.location.search);
+  const tagParam = searchParams.get('tag');
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [tagFilter, setTagFilter] = useState(tagParam || "");
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [consultationToDelete, setConsultationToDelete] = useState<string | null>(null);
@@ -57,6 +62,7 @@ const History = () => {
       searchQuery,
       dateFrom,
       dateTo,
+      tags: tagFilter ? [tagFilter] : undefined,
     },
     {
       page: currentPage,
@@ -275,10 +281,22 @@ const History = () => {
                 }}
                 className="bg-background border-border"
               />
+              
+              {/* Tag Filter */}
+              <Input
+                type="text"
+                placeholder="Filter by tag..."
+                value={tagFilter}
+                onChange={(e) => {
+                  setTagFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="bg-background border-border"
+              />
             </div>
 
             {/* Active Filters Summary */}
-            {(searchQuery || statusFilter !== "all" || dateFrom || dateTo) && (
+            {(searchQuery || statusFilter !== "all" || dateFrom || dateTo || tagFilter) && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>Active filters:</span>
                 {searchQuery && (
@@ -289,6 +307,7 @@ const History = () => {
                 )}
                 {dateFrom && <Badge variant="secondary">From: {dateFrom}</Badge>}
                 {dateTo && <Badge variant="secondary">To: {dateTo}</Badge>}
+                {tagFilter && <Badge variant="secondary">Tag: {tagFilter}</Badge>}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -297,6 +316,7 @@ const History = () => {
                     setStatusFilter("all");
                     setDateFrom("");
                     setDateTo("");
+                    setTagFilter("");
                     setCurrentPage(1);
                   }}
                   className="h-6 px-2 text-xs"
