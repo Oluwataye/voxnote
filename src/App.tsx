@@ -14,6 +14,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Settings from "./pages/Settings";
 import History from "./pages/History";
 import Analytics from "./pages/Analytics";
+import Templates from "./pages/Templates";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -88,6 +89,16 @@ const App = () => {
                     element={
                       isAuthenticated ? (
                         <Analytics />
+                      ) : (
+                        <Navigate to="/auth" replace />
+                      )
+                    }
+                  />
+                  <Route
+                    path="/templates"
+                    element={
+                      isAuthenticated ? (
+                        <Templates />
                       ) : (
                         <Navigate to="/auth" replace />
                       )

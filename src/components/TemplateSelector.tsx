@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CONSULTATION_TEMPLATES, ConsultationTemplate } from "@/types/templates";
+import { CONSULTATION_TEMPLATES, ConsultationTemplate, QuestionSet } from "@/types/templates";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { Heart, Baby, Stethoscope, Bone, Sparkles, Brain, ChevronRight, Check } from "lucide-react";
 
 interface TemplateSelectorProps {
@@ -28,6 +30,46 @@ export const TemplateSelector = ({ onSelectTemplate, onSkip }: TemplateSelectorP
   const [selectedTemplate, setSelectedTemplate] = useState<ConsultationTemplate | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
+  // Fetch custom templates
+  const { data: customTemplates } = useQuery({
+    queryKey: ["custom-templates-selector"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      const { data: templatesData } = await supabase
+        .from("custom_templates")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      const templatesWithQuestions = await Promise.all(
+        (templatesData || []).map(async (template) => {
+          const { data: questionSetsData } = await supabase
+            .from("template_question_sets")
+            .select("*")
+            .eq("template_id", template.id)
+            .order("order_index");
+
+          return {
+            ...template,
+            questionSets: (questionSetsData || []).map((qs: any) => ({
+              category: qs.category,
+              questions: qs.questions,
+            })),
+          };
+        })
+      );
+
+      return templatesWithQuestions as ConsultationTemplate[];
+    },
+  });
+
+  const allTemplates = [
+    ...(customTemplates || []),
+    ...CONSULTATION_TEMPLATES,
+  ];
+
   const handleViewDetails = (template: ConsultationTemplate) => {
     setSelectedTemplate(template);
     setDetailsOpen(true);
@@ -49,7 +91,7 @@ export const TemplateSelector = ({ onSelectTemplate, onSkip }: TemplateSelectorP
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {CONSULTATION_TEMPLATES.map((template) => {
+            {allTemplates.map((template) => {
               const Icon = getIcon(template.icon || "Stethoscope");
               return (
                 <Card
