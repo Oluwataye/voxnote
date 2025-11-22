@@ -1,5 +1,4 @@
 import { useState } from "react";
-import JSZip from "jszip";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -443,32 +442,39 @@ const Templates = () => {
       return;
     }
 
-    const zip = new JSZip();
+    try {
+      // Dynamic import to avoid bundling issues
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
 
-    templates.forEach((template) => {
-      const exportData = {
-        name: template.name,
-        description: template.description,
-        specialty: template.specialty,
-        tags: template.tags,
-        icon: template.icon,
-        question_sets: template.question_sets,
-      };
+      templates.forEach((template) => {
+        const exportData = {
+          name: template.name,
+          description: template.description,
+          specialty: template.specialty,
+          tags: template.tags,
+          icon: template.icon,
+          question_sets: template.question_sets,
+        };
 
-      const fileName = `${template.name.replace(/\s+/g, "_")}.json`;
-      zip.file(fileName, JSON.stringify(exportData, null, 2));
-    });
+        const fileName = `${template.name.replace(/\s+/g, "_")}.json`;
+        zip.file(fileName, JSON.stringify(exportData, null, 2));
+      });
 
-    const blob = await zip.generateAsync({ type: "blob" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `templates_${new Date().toISOString().split("T")[0]}.zip`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success(`Exported ${templates.length} templates as ZIP`);
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `templates_${new Date().toISOString().split("T")[0]}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${templates.length} templates as ZIP`);
+    } catch (error) {
+      console.error("Error creating ZIP:", error);
+      toast.error("Failed to create ZIP file");
+    }
   };
 
   const handleViewVersionHistory = (template: CustomTemplate) => {
