@@ -215,6 +215,56 @@ export type Database = {
           },
         ]
       }
+      template_versions: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+          question_sets: Json
+          specialty: string
+          tags: string[]
+          template_id: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          question_sets?: Json
+          specialty: string
+          tags?: string[]
+          template_id: string
+          version_number: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          question_sets?: Json
+          specialty?: string
+          tags?: string[]
+          template_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "custom_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_settings: {
         Row: {
           created_at: string | null
