@@ -28,7 +28,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { TagInput } from "@/components/TagInput";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, Loader2, Save, X } from "lucide-react";
+import { Plus, Edit, Trash2, Loader2, Save, X, Download, Upload } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface QuestionSet {
@@ -63,6 +63,7 @@ const Templates = () => {
   const [questionSets, setQuestionSets] = useState<QuestionSet[]>([]);
   const [currentCategory, setCurrentCategory] = useState("");
   const [currentQuestion, setCurrentQuestion] = useState("");
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   // Fetch custom templates
   const { data: templates, isLoading } = useQuery({
@@ -309,6 +310,66 @@ const Templates = () => {
     setQuestionSets(updatedSets);
   };
 
+  const handleExportTemplate = (template: CustomTemplate) => {
+    const exportData = {
+      name: template.name,
+      description: template.description,
+      specialty: template.specialty,
+      tags: template.tags,
+      icon: template.icon,
+      question_sets: template.question_sets,
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${template.name.replace(/\s+/g, "_")}_template.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Template exported successfully");
+  };
+
+  const handleImportTemplate = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const importedData = JSON.parse(text);
+
+      // Validate the imported data
+      if (!importedData.name || !importedData.specialty || !importedData.question_sets) {
+        toast.error("Invalid template file format");
+        return;
+      }
+
+      // Set the form data and question sets
+      setFormData({
+        name: importedData.name,
+        description: importedData.description || "",
+        specialty: importedData.specialty,
+        tags: importedData.tags || [],
+        icon: importedData.icon || "Stethoscope",
+      });
+      setQuestionSets(importedData.question_sets || []);
+      setSelectedTemplate(null);
+      setEditDialogOpen(true);
+      setImportDialogOpen(false);
+      toast.success("Template imported successfully");
+    } catch (error) {
+      console.error("Error importing template:", error);
+      toast.error("Failed to import template. Please check the file format.");
+    }
+
+    // Reset the file input
+    event.target.value = "";
+  };
+
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -329,10 +390,16 @@ const Templates = () => {
               Create and manage your custom consultation templates
             </p>
           </div>
-          <Button onClick={handleCreateNew} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Create Template
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => setImportDialogOpen(true)} variant="outline" className="gap-2">
+              <Upload className="w-4 h-4" />
+              Import
+            </Button>
+            <Button onClick={handleCreateNew} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Create Template
+            </Button>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -346,6 +413,14 @@ const Templates = () => {
                       <CardDescription className="mt-1">{template.specialty}</CardDescription>
                     </div>
                     <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleExportTemplate(template)}
+                        title="Export template"
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -546,6 +621,36 @@ const Templates = () => {
               Save Template
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import Template</DialogTitle>
+            <DialogDescription>
+              Select a JSON file to import a template
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center justify-center border-2 border-dashed border-border rounded-lg p-8">
+              <label className="cursor-pointer">
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleImportTemplate}
+                  className="hidden"
+                />
+                <div className="flex flex-col items-center gap-2">
+                  <Upload className="w-8 h-8 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    Click to select a JSON file
+                  </span>
+                </div>
+              </label>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
