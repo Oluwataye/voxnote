@@ -347,53 +347,198 @@ const Templates = () => {
     setQuestionSets(updatedSets);
   };
 
-  const handleExportTemplate = (template: CustomTemplate) => {
-    const exportData = {
-      name: template.name,
-      description: template.description,
-      specialty: template.specialty,
-      tags: template.tags,
-      icon: template.icon,
-      question_sets: template.question_sets,
-    };
+  const handleExportTemplate = async (template: CustomTemplate) => {
+    try {
+      const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = await import("docx");
+      const { saveAs } = await import("file-saver");
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${template.name.replace(/\s+/g, "_")}_template.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success("Template exported successfully");
+      const children = [
+        new Paragraph({
+          text: template.name,
+          heading: HeadingLevel.HEADING_1,
+          alignment: AlignmentType.CENTER,
+        }),
+        new Paragraph({ text: "" }),
+        new Paragraph({
+          children: [
+            new TextRun({ text: "Description: ", bold: true }),
+            new TextRun(template.description || "N/A"),
+          ],
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({ text: "Specialty: ", bold: true }),
+            new TextRun(template.specialty),
+          ],
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({ text: "Tags: ", bold: true }),
+            new TextRun(template.tags.join(", ") || "N/A"),
+          ],
+        }),
+        new Paragraph({
+          children: [
+            new TextRun({ text: "Icon: ", bold: true }),
+            new TextRun(template.icon),
+          ],
+        }),
+        new Paragraph({ text: "" }),
+        new Paragraph({
+          text: "Question Sets",
+          heading: HeadingLevel.HEADING_2,
+        }),
+      ];
+
+      // Add each question set as a table
+      template.question_sets?.forEach((qs, idx) => {
+        children.push(
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            children: [new TextRun({ text: `Category: ${qs.category}`, bold: true })],
+          })
+        );
+
+        const tableRows = qs.questions.map((q, qIdx) =>
+          new TableRow({
+            children: [
+              new TableCell({
+                children: [new Paragraph({ text: `${qIdx + 1}` })],
+                width: { size: 10, type: WidthType.PERCENTAGE },
+              }),
+              new TableCell({
+                children: [new Paragraph({ text: q })],
+                width: { size: 90, type: WidthType.PERCENTAGE },
+              }),
+            ],
+          })
+        );
+
+        children.push(
+          new Table({
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: "#", bold: true })] })],
+                    width: { size: 10, type: WidthType.PERCENTAGE },
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: "Question", bold: true })] })],
+                    width: { size: 90, type: WidthType.PERCENTAGE },
+                  }),
+                ],
+              }),
+              ...tableRows,
+            ],
+            width: { size: 100, type: WidthType.PERCENTAGE },
+          }) as any
+        );
+      });
+
+      const doc = new Document({
+        sections: [{ children }],
+      });
+
+      const { Packer } = await import("docx");
+      const blob = await Packer.toBlob(doc);
+      saveAs(blob, `${template.name.replace(/\s+/g, "_")}_template.docx`);
+      toast.success("Template exported successfully");
+    } catch (error) {
+      console.error("Error exporting template:", error);
+      toast.error("Failed to export template");
+    }
   };
 
   const handleImportTemplate = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    if (!file.name.endsWith(".docx")) {
+      toast.error("Please select a Word document (.docx) file");
+      event.target.value = "";
+      return;
+    }
+
     try {
-      const text = await file.text();
-      const importedData = JSON.parse(text);
+      const mammoth = await import("mammoth");
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      const text = result.value;
+
+      // Parse the Word document text
+      const lines = text.split("\n").map(l => l.trim()).filter(l => l);
+      
+      let name = "";
+      let description = "";
+      let specialty = "";
+      let tags: string[] = [];
+      let icon = "Stethoscope";
+      const questionSetsData: QuestionSet[] = [];
+
+      let currentCategory = "";
+      let currentQuestions: string[] = [];
+      let parsingQuestions = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        if (i === 0) {
+          name = line; // First line is the title
+        } else if (line.startsWith("Description:")) {
+          description = line.replace("Description:", "").trim();
+        } else if (line.startsWith("Specialty:")) {
+          specialty = line.replace("Specialty:", "").trim();
+        } else if (line.startsWith("Tags:")) {
+          const tagText = line.replace("Tags:", "").trim();
+          tags = tagText.split(",").map(t => t.trim()).filter(t => t && t !== "N/A");
+        } else if (line.startsWith("Icon:")) {
+          icon = line.replace("Icon:", "").trim();
+        } else if (line.startsWith("Category:")) {
+          // Save previous category if exists
+          if (currentCategory && currentQuestions.length > 0) {
+            questionSetsData.push({
+              category: currentCategory,
+              questions: currentQuestions,
+              order_index: questionSetsData.length,
+            });
+          }
+          currentCategory = line.replace("Category:", "").trim();
+          currentQuestions = [];
+          parsingQuestions = true;
+        } else if (parsingQuestions && line && !line.startsWith("#") && !line.toLowerCase().includes("question")) {
+          // Parse question (remove leading numbers like "1.", "2.", etc.)
+          const question = line.replace(/^\d+\.?\s*/, "").trim();
+          if (question) {
+            currentQuestions.push(question);
+          }
+        }
+      }
+
+      // Save last category
+      if (currentCategory && currentQuestions.length > 0) {
+        questionSetsData.push({
+          category: currentCategory,
+          questions: currentQuestions,
+          order_index: questionSetsData.length,
+        });
+      }
 
       // Validate the imported data
-      if (!importedData.name || !importedData.specialty || !importedData.question_sets) {
-        toast.error("Invalid template file format");
+      if (!name || !specialty || questionSetsData.length === 0) {
+        toast.error("Invalid template file format. Make sure the document contains all required fields.");
         return;
       }
 
       // Set the form data and question sets
       setFormData({
-        name: importedData.name,
-        description: importedData.description || "",
-        specialty: importedData.specialty,
-        tags: importedData.tags || [],
-        icon: importedData.icon || "Stethoscope",
+        name,
+        description,
+        specialty,
+        tags,
+        icon,
       });
-      setQuestionSets(importedData.question_sets || []);
+      setQuestionSets(questionSetsData);
       setSelectedTemplate(null);
       setEditDialogOpen(true);
       setImportDialogOpen(false);
@@ -407,33 +552,119 @@ const Templates = () => {
     event.target.value = "";
   };
 
-  const handleBulkExportJSON = () => {
+  const handleBulkExportWord = async () => {
     if (!templates || templates.length === 0) {
       toast.error("No templates to export");
       return;
     }
 
-    const exportData = templates.map((template) => ({
-      name: template.name,
-      description: template.description,
-      specialty: template.specialty,
-      tags: template.tags,
-      icon: template.icon,
-      question_sets: template.question_sets,
-    }));
+    try {
+      const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, PageBreak } = await import("docx");
+      const { saveAs } = await import("file-saver");
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `all_templates_${new Date().toISOString().split("T")[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success(`Exported ${templates.length} templates as JSON`);
+      const allChildren: any[] = [];
+
+      templates.forEach((template, templateIdx) => {
+        if (templateIdx > 0) {
+          allChildren.push(new Paragraph({ children: [new PageBreak()] }));
+        }
+
+        allChildren.push(
+          new Paragraph({
+            text: template.name,
+            heading: HeadingLevel.HEADING_1,
+            alignment: AlignmentType.CENTER,
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Description: ", bold: true }),
+              new TextRun(template.description || "N/A"),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Specialty: ", bold: true }),
+              new TextRun(template.specialty),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Tags: ", bold: true }),
+              new TextRun(template.tags.join(", ") || "N/A"),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Icon: ", bold: true }),
+              new TextRun(template.icon),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            text: "Question Sets",
+            heading: HeadingLevel.HEADING_2,
+          })
+        );
+
+        template.question_sets?.forEach((qs) => {
+          allChildren.push(
+            new Paragraph({ text: "" }),
+            new Paragraph({
+              children: [new TextRun({ text: `Category: ${qs.category}`, bold: true })],
+            })
+          );
+
+          const tableRows = qs.questions.map((q, qIdx) =>
+            new TableRow({
+              children: [
+                new TableCell({
+                  children: [new Paragraph({ text: `${qIdx + 1}` })],
+                  width: { size: 10, type: WidthType.PERCENTAGE },
+                }),
+                new TableCell({
+                  children: [new Paragraph({ text: q })],
+                  width: { size: 90, type: WidthType.PERCENTAGE },
+                }),
+              ],
+            })
+          );
+
+          allChildren.push(
+            new Table({
+              rows: [
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph({ children: [new TextRun({ text: "#", bold: true })] })],
+                      width: { size: 10, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ children: [new TextRun({ text: "Question", bold: true })] })],
+                      width: { size: 90, type: WidthType.PERCENTAGE },
+                    }),
+                  ],
+                }),
+                ...tableRows,
+              ],
+              width: { size: 100, type: WidthType.PERCENTAGE },
+            }) as any
+          );
+        });
+      });
+
+      const doc = new Document({
+        sections: [{ children: allChildren }],
+      });
+
+      const { Packer } = await import("docx");
+      const blob = await Packer.toBlob(doc);
+      saveAs(blob, `all_templates_${new Date().toISOString().split("T")[0]}.docx`);
+      toast.success(`Exported ${templates.length} templates as Word document`);
+    } catch (error) {
+      console.error("Error creating Word document:", error);
+      toast.error("Failed to create Word document");
+    }
   };
 
   const handleBulkExportZIP = async () => {
@@ -443,33 +674,107 @@ const Templates = () => {
     }
 
     try {
-      // Dynamic import to avoid bundling issues
       const JSZip = (await import("jszip")).default;
+      const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, Packer } = await import("docx");
+      
       const zip = new JSZip();
 
-      templates.forEach((template) => {
-        const exportData = {
-          name: template.name,
-          description: template.description,
-          specialty: template.specialty,
-          tags: template.tags,
-          icon: template.icon,
-          question_sets: template.question_sets,
-        };
+      for (const template of templates) {
+        const children = [
+          new Paragraph({
+            text: template.name,
+            heading: HeadingLevel.HEADING_1,
+            alignment: AlignmentType.CENTER,
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Description: ", bold: true }),
+              new TextRun(template.description || "N/A"),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Specialty: ", bold: true }),
+              new TextRun(template.specialty),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Tags: ", bold: true }),
+              new TextRun(template.tags.join(", ") || "N/A"),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Icon: ", bold: true }),
+              new TextRun(template.icon),
+            ],
+          }),
+          new Paragraph({ text: "" }),
+          new Paragraph({
+            text: "Question Sets",
+            heading: HeadingLevel.HEADING_2,
+          }),
+        ];
 
-        const fileName = `${template.name.replace(/\s+/g, "_")}.json`;
-        zip.file(fileName, JSON.stringify(exportData, null, 2));
-      });
+        template.question_sets?.forEach((qs) => {
+          children.push(
+            new Paragraph({ text: "" }),
+            new Paragraph({
+              children: [new TextRun({ text: `Category: ${qs.category}`, bold: true })],
+            })
+          );
 
-      const blob = await zip.generateAsync({ type: "blob" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `templates_${new Date().toISOString().split("T")[0]}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+          const tableRows = qs.questions.map((q, qIdx) =>
+            new TableRow({
+              children: [
+                new TableCell({
+                  children: [new Paragraph({ text: `${qIdx + 1}` })],
+                  width: { size: 10, type: WidthType.PERCENTAGE },
+                }),
+                new TableCell({
+                  children: [new Paragraph({ text: q })],
+                  width: { size: 90, type: WidthType.PERCENTAGE },
+                }),
+              ],
+            })
+          );
+
+          children.push(
+            new Table({
+              rows: [
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph({ children: [new TextRun({ text: "#", bold: true })] })],
+                      width: { size: 10, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ children: [new TextRun({ text: "Question", bold: true })] })],
+                      width: { size: 90, type: WidthType.PERCENTAGE },
+                    }),
+                  ],
+                }),
+                ...tableRows,
+              ],
+              width: { size: 100, type: WidthType.PERCENTAGE },
+            }) as any
+          );
+        });
+
+        const doc = new Document({
+          sections: [{ children }],
+        });
+
+        const blob = await Packer.toBlob(doc);
+        const fileName = `${template.name.replace(/\s+/g, "_")}.docx`;
+        zip.file(fileName, blob);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const { saveAs } = await import("file-saver");
+      saveAs(zipBlob, `templates_${new Date().toISOString().split("T")[0]}.zip`);
       toast.success(`Exported ${templates.length} templates as ZIP`);
     } catch (error) {
       console.error("Error creating ZIP:", error);
@@ -558,9 +863,9 @@ const Templates = () => {
             </Button>
             {templates && templates.length > 0 && (
               <>
-                <Button onClick={handleBulkExportJSON} variant="outline" className="gap-2">
+                <Button onClick={handleBulkExportWord} variant="outline" className="gap-2">
                   <Download className="w-4 h-4" />
-                  Export All (JSON)
+                  Export All (Word)
                 </Button>
                 <Button onClick={handleBulkExportZIP} variant="outline" className="gap-2">
                   <Package className="w-4 h-4" />
@@ -878,7 +1183,7 @@ const Templates = () => {
           <DialogHeader>
             <DialogTitle>Import Template</DialogTitle>
             <DialogDescription>
-              Select a JSON file to import a template
+              Select a Word document (.docx) file to import a template
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -886,14 +1191,14 @@ const Templates = () => {
               <label className="cursor-pointer">
                 <input
                   type="file"
-                  accept=".json"
+                  accept=".docx"
                   onChange={handleImportTemplate}
                   className="hidden"
                 />
                 <div className="flex flex-col items-center gap-2">
                   <Upload className="w-8 h-8 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
-                    Click to select a JSON file
+                    Click to select a Word document (.docx)
                   </span>
                 </div>
               </label>
