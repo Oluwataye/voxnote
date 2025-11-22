@@ -1,4 +1,5 @@
 import { useState } from "react";
+import JSZip from "jszip";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { TagInput } from "@/components/TagInput";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, Loader2, Save, X, Download, Upload } from "lucide-react";
+import { Plus, Edit, Trash2, Loader2, Save, X, Download, Upload, History, RotateCcw, Package } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface QuestionSet {
@@ -48,6 +49,20 @@ interface CustomTemplate {
   question_sets?: QuestionSet[];
 }
 
+interface TemplateVersion {
+  id: string;
+  template_id: string;
+  version_number: number;
+  name: string;
+  description: string;
+  specialty: string;
+  tags: string[];
+  icon: string;
+  question_sets: QuestionSet[];
+  created_at: string;
+  created_by: string;
+}
+
 const Templates = () => {
   const queryClient = useQueryClient();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -64,6 +79,29 @@ const Templates = () => {
   const [currentCategory, setCurrentCategory] = useState("");
   const [currentQuestion, setCurrentQuestion] = useState("");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+  const [selectedTemplateForVersions, setSelectedTemplateForVersions] = useState<CustomTemplate | null>(null);
+
+  // Fetch template versions
+  const { data: versions } = useQuery({
+    queryKey: ["template-versions", selectedTemplateForVersions?.id],
+    queryFn: async () => {
+      if (!selectedTemplateForVersions) return [];
+
+      const { data, error } = await supabase
+        .from("template_versions")
+        .select("*")
+        .eq("template_id", selectedTemplateForVersions.id)
+        .order("version_number", { ascending: false });
+
+      if (error) throw error;
+      return (data || []).map(v => ({
+        ...v,
+        question_sets: v.question_sets as unknown as QuestionSet[]
+      }));
+    },
+    enabled: !!selectedTemplateForVersions,
+  });
 
   // Fetch custom templates
   const { data: templates, isLoading } = useQuery({
@@ -370,6 +408,123 @@ const Templates = () => {
     event.target.value = "";
   };
 
+  const handleBulkExportJSON = () => {
+    if (!templates || templates.length === 0) {
+      toast.error("No templates to export");
+      return;
+    }
+
+    const exportData = templates.map((template) => ({
+      name: template.name,
+      description: template.description,
+      specialty: template.specialty,
+      tags: template.tags,
+      icon: template.icon,
+      question_sets: template.question_sets,
+    }));
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `all_templates_${new Date().toISOString().split("T")[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${templates.length} templates as JSON`);
+  };
+
+  const handleBulkExportZIP = async () => {
+    if (!templates || templates.length === 0) {
+      toast.error("No templates to export");
+      return;
+    }
+
+    const zip = new JSZip();
+
+    templates.forEach((template) => {
+      const exportData = {
+        name: template.name,
+        description: template.description,
+        specialty: template.specialty,
+        tags: template.tags,
+        icon: template.icon,
+        question_sets: template.question_sets,
+      };
+
+      const fileName = `${template.name.replace(/\s+/g, "_")}.json`;
+      zip.file(fileName, JSON.stringify(exportData, null, 2));
+    });
+
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `templates_${new Date().toISOString().split("T")[0]}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${templates.length} templates as ZIP`);
+  };
+
+  const handleViewVersionHistory = (template: CustomTemplate) => {
+    setSelectedTemplateForVersions(template);
+    setVersionHistoryOpen(true);
+  };
+
+  const handleRestoreVersion = async (version: TemplateVersion) => {
+    if (!selectedTemplateForVersions) return;
+
+    try {
+      // Update the template with the version data
+      const { error: updateError } = await supabase
+        .from("custom_templates")
+        .update({
+          name: version.name,
+          description: version.description,
+          specialty: version.specialty,
+          tags: version.tags,
+          icon: version.icon,
+        })
+        .eq("id", selectedTemplateForVersions.id);
+
+      if (updateError) throw updateError;
+
+      // Delete existing question sets
+      await supabase
+        .from("template_question_sets")
+        .delete()
+        .eq("template_id", selectedTemplateForVersions.id);
+
+      // Insert question sets from version
+      if (version.question_sets && version.question_sets.length > 0) {
+        const { error: questionSetsError } = await supabase
+          .from("template_question_sets")
+          .insert(
+            version.question_sets.map((qs: QuestionSet, index: number) => ({
+              template_id: selectedTemplateForVersions.id,
+              category: qs.category,
+              questions: qs.questions,
+              order_index: index,
+            }))
+          );
+
+        if (questionSetsError) throw questionSetsError;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["custom-templates"] });
+      toast.success(`Restored to version ${version.version_number}`);
+      setVersionHistoryOpen(false);
+    } catch (error) {
+      console.error("Error restoring version:", error);
+      toast.error("Failed to restore version");
+    }
+  };
+
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -390,11 +545,23 @@ const Templates = () => {
               Create and manage your custom consultation templates
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button onClick={() => setImportDialogOpen(true)} variant="outline" className="gap-2">
               <Upload className="w-4 h-4" />
               Import
             </Button>
+            {templates && templates.length > 0 && (
+              <>
+                <Button onClick={handleBulkExportJSON} variant="outline" className="gap-2">
+                  <Download className="w-4 h-4" />
+                  Export All (JSON)
+                </Button>
+                <Button onClick={handleBulkExportZIP} variant="outline" className="gap-2">
+                  <Package className="w-4 h-4" />
+                  Export All (ZIP)
+                </Button>
+              </>
+            )}
             <Button onClick={handleCreateNew} className="gap-2">
               <Plus className="w-4 h-4" />
               Create Template
@@ -413,6 +580,14 @@ const Templates = () => {
                       <CardDescription className="mt-1">{template.specialty}</CardDescription>
                     </div>
                     <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewVersionHistory(template)}
+                        title="Version history"
+                      >
+                        <History className="w-4 h-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -621,6 +796,73 @@ const Templates = () => {
               Save Template
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Version History Dialog */}
+      <Dialog open={versionHistoryOpen} onOpenChange={setVersionHistoryOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Version History - {selectedTemplateForVersions?.name}</DialogTitle>
+            <DialogDescription>
+              View and restore previous versions of this template
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[60vh] pr-4">
+            {versions && versions.length > 0 ? (
+              <div className="space-y-3">
+                {versions.map((version) => (
+                  <Card key={version.id} className="bg-muted/30">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-sm">
+                            Version {version.version_number}
+                          </CardTitle>
+                          <CardDescription className="text-xs mt-1">
+                            {new Date(version.created_at).toLocaleString()}
+                          </CardDescription>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRestoreVersion(version)}
+                          className="gap-2"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          Restore
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div>
+                        <p className="text-sm font-medium">{version.name}</p>
+                        <p className="text-xs text-muted-foreground">{version.specialty}</p>
+                      </div>
+                      {version.description && (
+                        <p className="text-xs text-muted-foreground">{version.description}</p>
+                      )}
+                      <div className="flex flex-wrap gap-1">
+                        {version.tags.map((tag) => (
+                          <Badge key={tag} variant="secondary" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {version.question_sets?.length || 0} question set(s)
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No version history available yet. Versions are created when you update the template.
+              </div>
+            )}
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 
